@@ -1,8 +1,14 @@
 <!DOCTYPE html>
   <head>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='gfx/favicon.ico') }}">
     <title>{{ title }}</title>
   </head>
   <body>
-    <h2>{{ header }}</h2>
+    <div style="border:1px solid orange;color:red;">{{ message }}</div>
+    <form action="/" method="POST">
+        <label for="valve">JSON valve settings:</label>
+        <input type="text" size="34" name="valve" id="valve" value="{&quot;type&quot;:&quot;setting&quot;,&quot;valveStates&quot;:[0,0,0,0,0,0,0,0]}" />
+        <input type="submit" value="klacker" />
+    </form>
   </body>
 </html>
