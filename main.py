@@ -33,6 +33,27 @@ def index():
     }
     return render_template('main.html', **templateData)
 
+@app.route("/data/plant.json", methods=['GET', 'POST'])
+def data():
+    plant = []
+    plant.append({'valve': 1, 'name': 'Glückskastanie (Pachira aquatica)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'daily', 'measures':[40,30,20,60,20,50,10], 'isActive': 1 })
+    plant.append({'valve': 2, 'name': 'Elefantenfuß (Beaucarnea recurvata)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures':[40,30,30,40,40,30,40], 'isActive': 1})
+    plant.append({'valve': 3, 'name': 'Wolfsmilch (Euphorbia trigona)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures': [40,30,40,60,40,50,50], 'isActive': 0 })
+    response = json.dumps({'plant':[plant[0],plant[1],plant[2]]})
+    return response
+
+@app.route("/actions/manualwatering", methods=['GET', 'POST'])
+def actionManualwatering():
+    if request.method == 'POST':
+        params = request.get_json();
+        valveNo = params['id']
+        duration = params['duration']
+        valves = Shiftregister()
+        valves.outputBinary(valveNo)
+        print "opened valve %i" % valveNo
+    response = 'watered plants.';
+    return response
+
 if __name__ == "__main__":
     app.run(
         host='0.0.0.0', port=2525, debug=True

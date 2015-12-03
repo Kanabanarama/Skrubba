@@ -56,6 +56,14 @@ class Shiftregister(object):
         self.__pulseLatch()
         return
 
+    def outputList(self, valueList):
+        binaryValue = 0
+        for i in range(0,8):
+            if valveStates[i] == 1:
+                binaryValue = binaryValue | 2**i
+        self.outputBinary(binaryValue)
+        return
+
     def testLoop():
         while 1:
             bitValue = 1
