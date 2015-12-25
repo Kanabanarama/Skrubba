@@ -49,32 +49,48 @@ def data():
     if action == 'read':
         plants = []
         valveSettings = db.loadValveSettings()
-        if(valveSettings):
-            for setting in valveSettings:
-                plant = {}
-                plant['valve'] = setting['valve']
-                plant['name'] = setting['name']
-                plant['onTime'] = setting['on_time']
-                plant['onDuration'] = setting['on_duration']
-                plant['intervalType'] = setting['interval_type']
-                plants.append(plant)
-            response = json.dumps({'plant':plants})
-        else:
-            plants.append({'valve': 1, 'name': 'Glückskastanie (Pachira aquatica)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'daily', 'measures':[40,30,20,60,20,50,10], 'isActive': 1 })
-            plants.append({'valve': 2, 'name': 'Elefantenfuß (Beaucarnea recurvata)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures':[40,30,30,40,40,30,40], 'isActive': 1})
-            plants.append({'valve': 3, 'name': 'Wolfsmilch (Euphorbia trigona)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures': [40,30,40,60,40,50,50], 'isActive': 0 })
-            response = json.dumps({'plant':[plants[0],plants[1],plants[2]]})
+        print valveSettings
+        #if(valveSettings):
+        for setting in valveSettings:
+            plant = {}
+            plant['valve'] = setting['valve']
+            plant['name'] = setting['name']
+            plant['onTime'] = setting['on_time']
+            plant['onDuration'] = setting['on_duration']
+            plant['intervalType'] = setting['interval_type']
+            plant['isActive'] = setting['is_active']
+            plants.append(plant)
+        response = json.dumps({'plant':plants})
+        #else:
+        #    plants.append({'valve': 1, 'name': 'Glückskastanie (Pachira aquatica)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'daily', 'measures':[40,30,20,60,20,50,10], 'isActive': 1 })
+        #    plants.append({'valve': 2, 'name': 'Elefantenfuß (Beaucarnea recurvata)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures':[40,30,30,40,40,30,40], 'isActive': 1})
+        #    plants.append({'valve': 3, 'name': 'Wolfsmilch (Euphorbia trigona)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures': [40,30,40,60,40,50,50], 'isActive': 0 })
+        #    response = json.dumps({'plant':[plants[0],plants[1],plants[2]]})
+        #    response = json.dumps({'plant':[]})
     elif action == 'create':
         #jsonValveSettings = request.get_json();
         jsonValveSettings = request.form['plant']
         valveSettings = json.loads(jsonValveSettings)
-        print 'SETTINGS:'
+        print 'SAVED SETTINGS:'
         print valveSettings
         valveSetting = valveSettings
-        #query = 'INSERT INTO valve_settings (valve, name, on_time, on_duration, interval_type) VALUES ({valve}, "{name}", "{on_time}", {on_duration}, "{interval_type}")'
-        #dbquery = query.format(valve=1, name="test", on_time="18:30", on_duration=15, interval_type="daily")
-        #db.query(dbquery)
-        db.addValveSetting(valveSetting['valve'], valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'])
+        newRow = db.addValveSetting(valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'])
+        response = json.dumps({'success': 1, 'plant': newRow})
+    elif action == 'update':
+        jsonValveSettings = request.form['plant']
+        valveSettings = json.loads(jsonValveSettings)
+        print 'UPDATED SETTINGS:'
+        print valveSettings
+        valveSetting = valveSettings
+        db.saveValveSetting(valveSetting['valve'], valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'], valveSetting['isActive'])
+        response = json.dumps({'success':1})
+    elif action == 'destroy':
+        jsonValveSettings = request.form['plant']
+        valveSettings = json.loads(jsonValveSettings)
+        print 'DELETED SETTINGS:'
+        print valveSettings
+        valveSetting = valveSettings
+        db.deleteValveSetting(valveSetting['valve'])
         response = json.dumps({'success':1})
 
     return response

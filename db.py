@@ -30,28 +30,28 @@ class DB(object):
         return False
 
     def __createTables(self):
-        self._cursor.execute('CREATE TABLE valve_settings(valve INT, name TEXT, on_time DATETIME, on_duration INT, interval_type TEXT);')
-        print "Created table."
-        return True
+        print "Creating table..."
+        success = self._cursor.execute('CREATE TABLE valve_settings(valve INTEGER PRIMARY KEY, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
+        return success
 
     def query(self, query, params = None):
         self._cursor.execute(query)
         self._connection.commit()
         return self._cursor
 
-    def addValveSetting(self, valve, name, onTime, onDuration):
-        success = self._cursor.execute('INSERT INTO valve_settings values((?), (?), (?), (?), (?));', (valve, name, onTime, onDuration, 'daily'))
-        #print 'INSERT: %i' % success
+    def addValveSetting(self, name, onTime, onDuration, intervalType):
+        success = self._cursor.execute('INSERT INTO valve_settings(name, on_time, on_duration, interval_type) VALUES((?), (?), (?), (?));', (name, onTime, onDuration, 'daily'))
         self._connection.commit()
-        return success
+        row = [{'valve': self._cursor.lastrowid}]
+        return row
 
-    def saveValveSetting(self, onTime, onDuration, intervalType):
-        success = self._cursor.execute('UPDATE valve_settings set on_time = (?);', (onTime,))
+    def saveValveSetting(self, valve, name, onTime, onDuration, intervalType, isActive):
+        success = self._cursor.execute('UPDATE valve_settings set name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE valve = (?);', (name, onTime, onDuration, intervalType, isActive, valve))
         self._connection.commit()
         return success
 
     def deleteValveSetting(self, valveID):
-        success = self._cursor.execute('DELETE FROM valve_settings WHERE valve_no = (?);', (valveID,))
+        success = self._cursor.execute('DELETE FROM valve_settings WHERE valve = (?);', (valveID,))
         self._connection.commit()
         return success
 
@@ -59,10 +59,7 @@ class DB(object):
         rows = []
         self._cursor.execute('SELECT * FROM valve_settings')
         for row in self._cursor:
-            #print row['name']
+            print row
             rowDict = dict(itertools.izip(row.keys(), row))
             rows.append(rowDict)
         return rows
-
-    #if createTables() == True:
-    #    message = "SQLite Database is in place."
