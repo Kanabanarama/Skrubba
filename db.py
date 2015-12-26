@@ -5,7 +5,7 @@
 # Database is sqlite3
 # by Kana kanabanarama@googlemail.com
 
-import sqlite3, itertools, os
+import sqlite3, itertools, re, os
 
 class DB(object):
     _connection = None
@@ -31,7 +31,7 @@ class DB(object):
 
     def __createTables(self):
         print "Creating table..."
-        success = self._cursor.execute('CREATE TABLE valve_settings(valve INTEGER PRIMARY KEY, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
+        success = self._cursor.execute('CREATE TABLE valve_settings(id INTEGER PRIMARY KEY, valve INTEGER, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
         return success
 
     def query(self, query, params = None):
@@ -40,18 +40,27 @@ class DB(object):
         return self._cursor
 
     def addValveSetting(self, name, onTime, onDuration, intervalType):
-        success = self._cursor.execute('INSERT INTO valve_settings(name, on_time, on_duration, interval_type) VALUES((?), (?), (?), (?));', (name, onTime, onDuration, 'daily'))
+        # find first available valve
+        self._cursor.execute('SELECT (s1.valve+1) as unused FROM valve_settings s1 LEFT JOIN valve_settings s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL')
+        nextUnusedValve = self._cursor.fetchone()
+        if nextUnusedValve is not None:
+            #print int(re.search(r'\d+', nextUnusedValve).group())
+            nextUnusedValve = nextUnusedValve[0]
+        else:
+            nextUnusedValve = 1
+        success = self._cursor.execute('INSERT INTO valve_settings(valve, name, on_time, on_duration, interval_type) VALUES((?), (?), (?), (?), (?));', (nextUnusedValve, name, onTime, onDuration, 'daily')) #(SELECT IFNULL(MAX(valve), 0) + 1 FROM valve_settings)
         self._connection.commit()
-        row = [{'valve': self._cursor.lastrowid}]
+        row = [{'id': self._cursor.lastrowid, 'valve': nextUnusedValve}]
         return row
 
-    def saveValveSetting(self, valve, name, onTime, onDuration, intervalType, isActive):
-        success = self._cursor.execute('UPDATE valve_settings set name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE valve = (?);', (name, onTime, onDuration, intervalType, isActive, valve))
+    def saveValveSetting(self, id, valve, name, onTime, onDuration, intervalType, isActive):
+        success = self._cursor.execute('UPDATE valve_settings set valve = (?), name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE id = (?);', (valve, name, onTime, onDuration, intervalType, isActive, id))
         self._connection.commit()
+
         return success
 
-    def deleteValveSetting(self, valveID):
-        success = self._cursor.execute('DELETE FROM valve_settings WHERE valve = (?);', (valveID,))
+    def deleteValveSetting(self, id):
+        success = self._cursor.execute('DELETE FROM valve_settings WHERE id = (?);', (id,))
         self._connection.commit()
         return success
 
@@ -59,7 +68,6 @@ class DB(object):
         rows = []
         self._cursor.execute('SELECT * FROM valve_settings')
         for row in self._cursor:
-            print row
             rowDict = dict(itertools.izip(row.keys(), row))
             rows.append(rowDict)
         return rows
