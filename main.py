@@ -69,30 +69,41 @@ def data():
         #    plants.append({'valve': 3, 'name': 'Wolfsmilch (Euphorbia trigona)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures': [40,30,40,60,40,50,50], 'isActive': 0 })
         #    response = json.dumps({'plant':[plants[0],plants[1],plants[2]]})
         #    response = json.dumps({'plant':[]})
+
     elif action == 'create':
-        #jsonValveSettings = request.get_json();
         jsonValveSettings = request.form['plant']
-        valveSettings = json.loads(jsonValveSettings)
-        valveSetting = valveSettings
+        valveSetting = json.loads(jsonValveSettings)
         print 'CREATED SETTINGS:'
         print valveSetting
         newRow = db.addValveSetting(valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'])
-        response = json.dumps({'success': 1, 'plant': newRow})
+
+        if len(newRow):
+            responseObj = { 'success': 'true', 'plant': newRow }
+        else:
+            responseObj = { 'success': 'false' }
+        response = json.dumps(responseObj)
+
     elif action == 'update':
         jsonValveSettings = request.form['plant']
         valveSetting = json.loads(jsonValveSettings)
         print 'UPDATED SETTINGS:'
         print valveSetting
         success = db.saveValveSetting(valveSetting['id'], valveSetting['valve'], valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'], valveSetting['isActive'])
-        response = json.dumps({'success': success})
+
+        if success == True:
+            responseObj = { 'success': 'true' }
+        else:
+            responseObj = { 'success': 'false', 'message': 'Valve already used by another entry.' }
+        response = json.dumps(responseObj)#{'success': 'false', 'message': }#, 500 #'metaData': { 'messageProperty': 'msg', 'successProperty': 'success' }
+
     elif action == 'destroy':
         jsonValveSettings = request.form['plant']
-        valveSettings = json.loads(jsonValveSettings)
+        valveSetting = json.loads(jsonValveSettings)
         print 'DELETED SETTINGS:'
-        print valveSettings
-        valveSetting = valveSettings
-        db.deleteValveSetting(valveSetting['id'])
-        response = json.dumps({'success':1})
+        print valveSetting
+        success = db.deleteValveSetting(valveSetting['id'])
+
+        response = json.dumps({ 'success': str(success).lower() })
 
     return response
 

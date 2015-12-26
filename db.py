@@ -31,13 +31,14 @@ class DB(object):
 
     def __createTables(self):
         print "Creating table..."
-        success = self._cursor.execute('CREATE TABLE valve_settings(id INTEGER PRIMARY KEY, valve INTEGER, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
+        self._cursor.execute('CREATE TABLE valve_settings(id INTEGER PRIMARY KEY, valve INTEGER UNIQUE, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
+        success = bool(self._cursor.rowcount)
         return success
 
-    def query(self, query, params = None):
-        self._cursor.execute(query)
-        self._connection.commit()
-        return self._cursor
+    #def query(self, query, params = None):
+    #    self._cursor.execute(query)
+    #    self._connection.commit()
+    #    return self._cursor
 
     def addValveSetting(self, name, onTime, onDuration, intervalType):
         # find first available valve
@@ -50,18 +51,22 @@ class DB(object):
             nextUnusedValve = 1
         success = self._cursor.execute('INSERT INTO valve_settings(valve, name, on_time, on_duration, interval_type) VALUES((?), (?), (?), (?), (?));', (nextUnusedValve, name, onTime, onDuration, 'daily')) #(SELECT IFNULL(MAX(valve), 0) + 1 FROM valve_settings)
         self._connection.commit()
-        row = [{'id': self._cursor.lastrowid, 'valve': nextUnusedValve}]
+        row = [{ 'id': self._cursor.lastrowid, 'valve': nextUnusedValve }]
         return row
 
     def saveValveSetting(self, id, valve, name, onTime, onDuration, intervalType, isActive):
-        success = self._cursor.execute('UPDATE valve_settings set valve = (?), name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE id = (?);', (valve, name, onTime, onDuration, intervalType, isActive, id))
-        self._connection.commit()
-
+        try:
+            success = self._cursor.execute('UPDATE valve_settings set valve = (?), name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE id = (?);', (valve, name, onTime, onDuration, intervalType, isActive, id))
+            self._connection.commit()
+            success = True
+        except sqlite3.IntegrityError:
+            success = False
         return success
 
     def deleteValveSetting(self, id):
-        success = self._cursor.execute('DELETE FROM valve_settings WHERE id = (?);', (id,))
+        self._cursor.execute('DELETE FROM valve_settings WHERE id = (?);', (id,))
         self._connection.commit()
+        success = bool(self._cursor.rowcount)
         return success
 
     def loadValveSettings(self):
