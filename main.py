@@ -2,9 +2,102 @@
 # -*- coding: utf-8 -*-
 
 from flask import Flask, render_template, request, json
+#from celery import Celery
 from shiftregister import Shiftregister
 from db import DB
-app = Flask(__name__, template_folder='templates')
+
+app = Flask(__name__, template_folder = 'templates')
+
+#app.config.update(
+#    CELERY_BROKER_URL = 'redis://localhost:6379/0',
+#    CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+#)
+
+#celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+#celery.conf.update(app.config)
+
+#@celery.task()
+#def valveWorker():
+#    console.log('test');
+#    return True
+
+#result = valveWorker.delay()
+#result.wait();
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR#, EVENT_JOB_MISSED
+import time, datetime
+
+#import logging
+#logging.basicConfig()
+
+scheduler = BackgroundScheduler(standalone = True)
+
+print 'JOBS:'
+print scheduler.get_jobs()
+
+@scheduler.scheduled_job('interval', seconds = 10)
+def valveWorker():
+    print 'Scheduler Job started %s' % datetime.datetime.now().time()
+    db = DB()
+    valveSettings = db.loadValveSettings()
+    #now = datetime.datetime.now()
+    for setting in valveSettings:
+        #print setting['on_time']
+        if setting['on_time'] and setting['on_duration']:
+            if(setting['interval_type'] == 'daily'):
+                #timeNow = datetime.datetime.now().strftime('%H:%M')
+                #timeComponents = setting['on_time'].split(':')
+                #timeComponents = [int(n) for n in setting['on_time'].split(':')]
+                timeComponents = map(int, setting['on_time'].split(':'))
+                timeNextRun = datetime.datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
+                timeNextRunFinished = timeNextRun + datetime.timedelta(seconds = setting['on_duration'])
+                timeNow = datetime.datetime.now()
+
+                # TODO: reload config after change
+
+                if timeNow > timeNextRun and timeNow < timeNextRunFinished:
+                    duration = int(setting['on_duration'])
+                    while duration > 0:
+                        time.sleep(1)
+                        duration -= 1
+                        print 'TIME LEFT: %i' % duration
+
+                    print 'FINISHED'
+
+                #print timeNow > nextRun
+
+
+
+                #if timeNow < setting['on_time']:
+                #    testTime = timeNow + setting['on_time']
+                #    print '__'
+            elif(setting['interval_type'] == 'weekly'):
+                print 'TODO: implement weekly interval'
+            elif(setting['interval_type'] == 'monthly'):
+                print 'TODO: implement monthly interval'
+            #nextRun = datetime.datetime.strptime(setting['on_time'], '%H:%M')
+                #print 'RUN'
+            #nextRun = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return
+
+scheduler.start()
+
+def schedulerJobEventListener(event):
+    if event.exception:
+        print('The scheduler job crashed.')
+    else:
+        print('The scheduler job finished successfully.')
+
+scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+
+#scheduler.shutdown(wait = True)
+
+
+
+
+
+
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
@@ -121,5 +214,5 @@ def actionManualwatering():
 
 if __name__ == "__main__":
     app.run(
-        host='0.0.0.0', port=2525, debug=True
+        host='0.0.0.0', port=2525, debug=False#True
     )
