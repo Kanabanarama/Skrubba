@@ -24,13 +24,13 @@ app = Flask(__name__, template_folder = 'templates')
 #result = valveWorker.delay()
 #result.wait();
 
-from apscheduler.schedulers.background import BackgroundScheduler
+#from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR#, EVENT_JOB_MISSED
-import time, datetime
+#import time, datetime
+import time
+from datetime import datetime
 
-#import logging
-#logging.basicConfig()
-
+'''
 scheduler = BackgroundScheduler(standalone = True)
 
 print 'JOBS:'
@@ -92,10 +92,61 @@ def schedulerJobEventListener(event):
 scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
 #scheduler.shutdown(wait = True)
+'''
+
+from apscheduler.schedulers.background import BackgroundScheduler
+#from apscheduler.schedulers import Scheduler
+
+#import logging
+#logging.basicConfig()
 
 
 
+'''
+def testJob():
+    print 'job'
+    return
 
+job = scheduler.add_job(testJob, run_date = datetime(2015, 12, 27, 15, 58))
+'''
+
+def valveJob(valve, onDuration):
+    print 'OPENING VALVE'
+    durationLeft = onDuration
+    while durationLeft > 0:
+        time.sleep(1)
+        durationLeft -= 1
+        print 'TIME LEFT: %i' % durationLeft
+    print 'CLOSING VALVE'
+    return
+
+def restartJobManager():
+    db = DB()
+    valveSettings = db.loadValveSettings()
+    scheduler = BackgroundScheduler(standalone = True)
+    for setting in valveSettings:
+        if setting['on_time'] and setting['on_duration']:
+            if(setting['interval_type'] == 'daily'):
+                timeComponents = map(int, setting['on_time'].split(':'))
+                #print timeComponents
+                timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
+                valveToOpen = int(setting['valve'])
+                openingDuration = int(setting['on_duration'])
+                #scheduler.add_job(valveJob, run_date = timeNextRun, args = [valveToOpen, openingDuration])
+                #scheduler.add_cron_job(valveJob, day_of_week = '0-7', hour = timeComponents[0], minute = timeComponents[1])
+                # TODO: implement active
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-fri', hour = timeComponents[0], minute = timeComponents[1], args = [valveToOpen, openingDuration])
+            if(setting['interval_type'] == 'weekly'):
+                print 'implement weekly interval'
+    scheduler.start()
+    print 'JOBS:'
+    #print scheduler.print_jobs()
+    print scheduler.get_jobs()
+    #for job in scheduler.get_jobs():
+    #    print job
+    #    print job.trigger
+    #    print job.trigger.hour
+    return
 
 
 
@@ -171,6 +222,7 @@ def data():
         newRow = db.addValveSetting(valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'])
 
         if len(newRow):
+            restartJobManager()
             responseObj = { 'success': 'true', 'plant': newRow }
         else:
             responseObj = { 'success': 'false' }
@@ -184,6 +236,7 @@ def data():
         success = db.saveValveSetting(valveSetting['id'], valveSetting['valve'], valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'], valveSetting['isActive'])
 
         if success == True:
+            restartJobManager()
             responseObj = { 'success': 'true' }
         else:
             responseObj = { 'success': 'false', 'message': 'Valve already used by another entry.' }
@@ -195,6 +248,7 @@ def data():
         print 'DELETED SETTINGS:'
         print valveSetting
         success = db.deleteValveSetting(valveSetting['id'])
+        restartJobManager()
 
         response = json.dumps({ 'success': str(success).lower() })
 
