@@ -2,113 +2,17 @@
 # -*- coding: utf-8 -*-
 
 from flask import Flask, render_template, request, json
-#from celery import Celery
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 from shiftregister import Shiftregister
 from db import DB
+from datetime import datetime
+import time
 
 app = Flask(__name__, template_folder = 'templates')
 
-#app.config.update(
-#    CELERY_BROKER_URL = 'redis://localhost:6379/0',
-#    CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-#)
-
-#celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
-#celery.conf.update(app.config)
-
-#@celery.task()
-#def valveWorker():
-#    console.log('test');
-#    return True
-
-#result = valveWorker.delay()
-#result.wait();
-
-#from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR#, EVENT_JOB_MISSED
-#import time, datetime
-import time
-from datetime import datetime
-
-'''
-scheduler = BackgroundScheduler(standalone = True)
-
-print 'JOBS:'
-print scheduler.get_jobs()
-
-@scheduler.scheduled_job('interval', seconds = 10)
-def valveWorker():
-    print 'Scheduler Job started %s' % datetime.datetime.now().time()
-    db = DB()
-    valveSettings = db.loadValveSettings()
-    #now = datetime.datetime.now()
-    for setting in valveSettings:
-        #print setting['on_time']
-        if setting['on_time'] and setting['on_duration']:
-            if(setting['interval_type'] == 'daily'):
-                #timeNow = datetime.datetime.now().strftime('%H:%M')
-                #timeComponents = setting['on_time'].split(':')
-                #timeComponents = [int(n) for n in setting['on_time'].split(':')]
-                timeComponents = map(int, setting['on_time'].split(':'))
-                timeNextRun = datetime.datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
-                timeNextRunFinished = timeNextRun + datetime.timedelta(seconds = setting['on_duration'])
-                timeNow = datetime.datetime.now()
-
-                # TODO: reload config after change
-
-                if timeNow > timeNextRun and timeNow < timeNextRunFinished:
-                    duration = int(setting['on_duration'])
-                    while duration > 0:
-                        time.sleep(1)
-                        duration -= 1
-                        print 'TIME LEFT: %i' % duration
-
-                    print 'FINISHED'
-
-                #print timeNow > nextRun
-
-
-
-                #if timeNow < setting['on_time']:
-                #    testTime = timeNow + setting['on_time']
-                #    print '__'
-            elif(setting['interval_type'] == 'weekly'):
-                print 'TODO: implement weekly interval'
-            elif(setting['interval_type'] == 'monthly'):
-                print 'TODO: implement monthly interval'
-            #nextRun = datetime.datetime.strptime(setting['on_time'], '%H:%M')
-                #print 'RUN'
-            #nextRun = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    return
-
-scheduler.start()
-
-def schedulerJobEventListener(event):
-    if event.exception:
-        print('The scheduler job crashed.')
-    else:
-        print('The scheduler job finished successfully.')
-
-scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
-
-#scheduler.shutdown(wait = True)
-'''
-
-from apscheduler.schedulers.background import BackgroundScheduler
-#from apscheduler.schedulers import Scheduler
-
 #import logging
 #logging.basicConfig()
-
-
-
-'''
-def testJob():
-    print 'job'
-    return
-
-job = scheduler.add_job(testJob, run_date = datetime(2015, 12, 27, 15, 58))
-'''
 
 def valveJob(valve, onDuration):
     print 'OPENING VALVE'
@@ -125,27 +29,20 @@ def restartJobManager():
     valveSettings = db.loadValveSettings()
     scheduler = BackgroundScheduler(standalone = True)
     for setting in valveSettings:
-        if setting['on_time'] and setting['on_duration']:
-            if(setting['interval_type'] == 'daily'):
+        if setting['on_time'] and setting['on_duration'] and setting['is_active']:
                 timeComponents = map(int, setting['on_time'].split(':'))
-                #print timeComponents
                 timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
                 valveToOpen = int(setting['valve'])
                 openingDuration = int(setting['on_duration'])
-                #scheduler.add_job(valveJob, run_date = timeNextRun, args = [valveToOpen, openingDuration])
-                #scheduler.add_cron_job(valveJob, day_of_week = '0-7', hour = timeComponents[0], minute = timeComponents[1])
-                # TODO: implement active
+            if(setting['interval_type'] == 'daily'):
                 scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-fri', hour = timeComponents[0], minute = timeComponents[1], args = [valveToOpen, openingDuration])
             if(setting['interval_type'] == 'weekly'):
-                print 'implement weekly interval'
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'so', hour = timeComponents[0], minute = timeComponents[1], args = [valveToOpen, openingDuration])
+            if(setting['interval_type'] == 'monthly'):
+                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [valveToOpen, openingDuration])
     scheduler.start()
     print 'JOBS:'
-    #print scheduler.print_jobs()
     print scheduler.get_jobs()
-    #for job in scheduler.get_jobs():
-    #    print job
-    #    print job.trigger
-    #    print job.trigger.hour
     return
 
 
