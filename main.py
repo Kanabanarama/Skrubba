@@ -18,11 +18,16 @@ logging.basicConfig()
 def valveJob(setting): #(valve, onDuration)
     print 'OPENING VALVE'
     durationLeft = int(setting['on_duration'])
+    binaryValveList = map(int, list(format(3, '08b')))
+    print binaryValveList
+    shiftreg = Shiftregister()
+    shiftreg.outputList(binaryValveList)
     while durationLeft > 0:
         time.sleep(1)
         durationLeft -= 1
         print 'TIME LEFT: %i' % durationLeft
     print 'CLOSING VALVE'
+    shiftreg.reset()
     db = DB()
     db.addLogLine(setting, datetime.now())
     return
