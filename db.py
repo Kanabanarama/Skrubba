@@ -35,7 +35,7 @@ class DB(object):
         createdTables = 0
         self._cursor.execute('CREATE TABLE valve_settings(id INTEGER PRIMARY KEY, valve INTEGER UNIQUE, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
         createdTables += self._cursor.rowcount
-        self._cursor.execute('CREATE TABLE valve_logs(id INTEGER PRIMARY KEY, valve INTEGER, on_time DATETIME, on_duration INTEGER, interval_type TEXT, last_on_date TEXT);')
+        self._cursor.execute('CREATE TABLE valve_logs(settings_id INTEGER, valve INTEGER, on_time DATETIME, on_duration INTEGER, interval_type TEXT, last_on_date TEXT);')
         createdTables += self._cursor.rowcount
         #success = bool(self._cursor.rowcount)
         success = (createdTables == 2)
@@ -79,6 +79,25 @@ class DB(object):
         rows = []
         self._cursor.execute('SELECT * FROM valve_settings')
         for row in self._cursor:
+            rowDict = dict(itertools.izip(row.keys(), row))
+            rows.append(rowDict)
+        return rows
+
+    def addLogLine(self, valveInfo, onDate):
+        print 'ADDING LOG LINE:'
+        print valveInfo
+        print onDate
+        success = self._cursor.execute('INSERT INTO valve_logs(settings_id, valve, on_time, on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), (?), (?));', (valveInfo['id'], valveInfo['valve'], valveInfo['on_time'], valveInfo['on_duration'], valveInfo['interval_type'], onDate))
+        self._connection.commit()
+        print 'LINES ADDED: %i' % self._cursor.rowcount
+        row = [{ 'id': self._cursor.lastrowid }]
+        return row
+
+    def loadLogs(self):
+        rows = []
+        self._cursor.execute('SELECT * FROM valve_logs LEFT JOIN valve_settings ON valve_logs.valve = valve_settings.valve')
+        for row in self._cursor:
+            print row
             rowDict = dict(itertools.izip(row.keys(), row))
             rows.append(rowDict)
         return rows

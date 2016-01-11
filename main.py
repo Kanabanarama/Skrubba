@@ -23,6 +23,8 @@ def valveJob(setting): #(valve, onDuration)
         durationLeft -= 1
         print 'TIME LEFT: %i' % durationLeft
     print 'CLOSING VALVE'
+    db = DB()
+    db.addLogLine(setting, datetime.now())
     return
 
 def startScheduler():
@@ -176,6 +178,24 @@ def plant():
         restartJobManager()
         response = json.dumps({ 'success': str(success).lower() })
 
+    return response
+
+@app.route("/data/log.json", methods=['GET', 'POST'])
+def log():
+    db = DB()
+    action = request.args.get('action')
+    if action == 'read':
+        logs = []
+        print 'READ LOGS:'
+        for line in db.loadLogs():
+            log = {}
+            #log['id'] = line['id']
+            log['valve'] = line['valve']
+            log['name'] = line['name']
+            log['intervalType'] = line['interval_type']
+            log['lastOnDate'] = line['last_on_date']
+            logs.append(log)
+        response = json.dumps({ 'log': logs })
     return response
 
 @app.route("/actions/manualwatering", methods=['GET', 'POST'])
