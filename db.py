@@ -21,6 +21,7 @@ class DB(object):
         return
 
     def __del__(self):
+        print "Closing db connection."
         self._connection.close()
         return
 
@@ -31,8 +32,13 @@ class DB(object):
 
     def __createTables(self):
         print "Creating table..."
+        createdTables = 0
         self._cursor.execute('CREATE TABLE valve_settings(id INTEGER PRIMARY KEY, valve INTEGER UNIQUE, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
-        success = bool(self._cursor.rowcount)
+        createdTables += self._cursor.rowcount
+        self._cursor.execute('CREATE TABLE valve_logs(id INTEGER PRIMARY KEY, valve INTEGER, on_time DATETIME, on_duration INTEGER, interval_type TEXT, last_on_date TEXT);')
+        createdTables += self._cursor.rowcount
+        #success = bool(self._cursor.rowcount)
+        success = (createdTables == 2)
         return success
 
     #def query(self, query, params = None):

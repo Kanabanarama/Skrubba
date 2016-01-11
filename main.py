@@ -10,13 +10,14 @@ from datetime import datetime
 import time
 
 app = Flask(__name__, template_folder = 'templates')
+scheduler = BackgroundScheduler(standalone = True)
 
-#import logging
-#logging.basicConfig()
+import logging
+logging.basicConfig()
 
-def valveJob(valve, onDuration):
+def valveJob(setting): #(valve, onDuration)
     print 'OPENING VALVE'
-    durationLeft = onDuration
+    durationLeft = int(setting['on_duration'])
     while durationLeft > 0:
         time.sleep(1)
         durationLeft -= 1
@@ -24,28 +25,56 @@ def valveJob(valve, onDuration):
     print 'CLOSING VALVE'
     return
 
+def startScheduler():
+    print 'Scheduler is running..'
+    scheduler.start()
+    scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+    return
+
+def schedulerJobEventListener(event):
+    if event.exception:
+        print('The scheduler job crashed.')
+    else:
+        print('The scheduler job finished successfully.')
+
+
 def restartJobManager():
     db = DB()
     valveSettings = db.loadValveSettings()
-    scheduler = BackgroundScheduler(standalone = True)
+
+    #if scheduler.running == True:
+    #    scheduler.shutdown()
+
+    # Remove all jobs
+    if len(scheduler.get_jobs()) > 0:
+        for job in scheduler.get_jobs():
+            scheduler.remove_job(job.id)
+
+    # Start scheduler if jobs are set and not already running
+    #if scheduler.running == False:
+    #    print 'Scheduler is running..'
+    #    scheduler.start()
+    #    scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+
     for setting in valveSettings:
         if setting['on_time'] and setting['on_duration'] and setting['is_active']:
-                timeComponents = map(int, setting['on_time'].split(':'))
-                timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
-                valveToOpen = int(setting['valve'])
-                openingDuration = int(setting['on_duration'])
+            timeComponents = map(int, setting['on_time'].split(':'))
+            timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
+            #valveToOpen = int(setting['valve'])
+            #openingDuration = int(setting['on_duration'])
             if(setting['interval_type'] == 'daily'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-fri', hour = timeComponents[0], minute = timeComponents[1], args = [valveToOpen, openingDuration])
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+                print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
             if(setting['interval_type'] == 'weekly'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'so', hour = timeComponents[0], minute = timeComponents[1], args = [valveToOpen, openingDuration])
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'so', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+                print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
             if(setting['interval_type'] == 'monthly'):
-                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [valveToOpen, openingDuration])
-    scheduler.start()
+                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+                print 'Scheduled monthly job [1st of the month %i:%i]' % (timeComponents[0], timeComponents[1])
+
     print 'JOBS:'
     print scheduler.get_jobs()
     return
-
-
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
@@ -81,7 +110,7 @@ def index():
     return render_template('main.html', **templateData)
 
 @app.route("/data/plant.json", methods=['GET', 'POST'])
-def data():
+def plant():
 
     db = DB()
 
@@ -129,9 +158,8 @@ def data():
         jsonValveSettings = request.form['plant']
         valveSetting = json.loads(jsonValveSettings)
         print 'UPDATED SETTINGS:'
-        print valveSetting
+        #print valveSetting
         success = db.saveValveSetting(valveSetting['id'], valveSetting['valve'], valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'], valveSetting['isActive'])
-
         if success == True:
             restartJobManager()
             responseObj = { 'success': 'true' }
@@ -146,7 +174,6 @@ def data():
         print valveSetting
         success = db.deleteValveSetting(valveSetting['id'])
         restartJobManager()
-
         response = json.dumps({ 'success': str(success).lower() })
 
     return response
@@ -164,6 +191,6 @@ def actionManualwatering():
     return response
 
 if __name__ == "__main__":
-    app.run(
-        host='0.0.0.0', port=2525, debug=False#True
-    )
+    startScheduler()
+    restartJobManager()
+    app.run(host = '0.0.0.0', port = 2525, debug = False) #True
