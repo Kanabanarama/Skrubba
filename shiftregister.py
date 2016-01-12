@@ -39,11 +39,16 @@ class Shiftregister(object):
         GPIO.output(self._LATCH, 0)
         return
 
-    def reset():
+    def reset(self):
         for x in range(0, 8):
             GPIO.output(self._DATA, 1)
             self.__pulseClock()
         self.__pulseLatch()
+        return
+
+    def outputDecimal(self, decimalValue):
+        binaryValue = 2**(int(decimalValue)-1)
+        self.outputBinary(binaryValue)
         return
 
     def outputBinary(self, binaryValue):
@@ -59,8 +64,8 @@ class Shiftregister(object):
     def outputList(self, valueList):
         binaryValue = 0
         for i in range(0,8):
-            if valveStates[i] == 1:
-                binaryValue = binaryValue | 2**i
+            if valueList[i] == 1:
+                valueList = binaryValue | 2**i
         self.outputBinary(binaryValue)
         return
 
