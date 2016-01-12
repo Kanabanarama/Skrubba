@@ -218,7 +218,7 @@ def actionManualwatering():
     return response
 
 def shutdownServer():
-    response = app.test_client().get('/test/url')
+    response = app.test_client().get('/shutdown')
     return response
 
 @app.route('/shutdown', methods=['POST'])
@@ -226,6 +226,7 @@ def shutdown():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
+    scheduler.shutdown()
     print 'Shutting down flask...'
     func()
     return
