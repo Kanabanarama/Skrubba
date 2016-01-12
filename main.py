@@ -8,6 +8,7 @@ from shiftregister import Shiftregister
 from db import DB
 from datetime import datetime
 import time
+import atexit
 
 app = Flask(__name__, template_folder = 'templates')
 scheduler = BackgroundScheduler(standalone = True)
@@ -216,7 +217,14 @@ def actionManualwatering():
     response = 'watered plants.';
     return response
 
+def shutdownServer():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+
 if __name__ == "__main__":
     startScheduler()
     restartJobManager()
+    atexit.register(shutdownServer)
     app.run(host = '0.0.0.0', port = 2525, debug = False) #True
