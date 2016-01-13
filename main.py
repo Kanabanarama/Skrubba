@@ -231,8 +231,8 @@ def prepareShutdown():
     func()
     return
 
-@app.route('/shutdown', methods=['POST'])
-def shutdown():
+@app.route('/serveroff', methods=['POST'])
+def serveroff():
     prepareShutdown()
     response = json.dumps({ 'success': 'true' })
     return response
@@ -241,6 +241,12 @@ def shutdown():
 def reboot():
     prepareShutdown()
     os.system("reboot")
+    return
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    prepareShutdown()
+    os.system("poweroff")
     return
 
 if __name__ == "__main__":
