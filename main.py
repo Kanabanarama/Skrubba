@@ -218,39 +218,66 @@ def actionManualwatering():
     response = 'watered plants.';
     return response
 
-def postShutdownRequest():
-    response = app.test_client().post('/shutdown')
+import socket
+
+def checkLocalAccess():
+    print 'checking access:'
+    requestIp = request.remote_addr
+    allowed = (requestIp == '127.0.0.1')
+    print requestIp
+    print allowed
+    return allowed
+
+def postServerOffRequest():
+    response = app.test_client().post('/serveroff')
     return response
 
-def prepareShutdown():
+def unloadScheduler():
+    print 'Shutting down scheduler...'
+    scheduler.shutdown()
+    return
+
+def unloadFlask():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
-    scheduler.shutdown()
     print 'Shutting down flask...'
     func()
     return
 
 @app.route('/serveroff', methods=['POST'])
 def serveroff():
-    prepareShutdown()
-    response = json.dumps({ 'success': 'true' })
+    print 'SERVER SHUTTING DOWN'
+    if checkLocalAccess() == True:
+        #unloadScheduler()
+        unloadFlask()
+        response = json.dumps({ 'success': 'true' })
+    else:
+        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
     return response
 
 @app.route('/reboot', methods=['POST'])
 def reboot():
-    prepareShutdown()
-    os.system("reboot")
+    if checkLocalAccess() == True:
+        #unloadScheduler()
+        unloadFlask()
+        os.system("reboot")
+    else:
+        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
     return
 
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
-    prepareShutdown()
-    os.system("poweroff")
+    if checkLocalAccess() == True:
+        #unloadScheduler()
+        unloadFlask()
+        os.system("poweroff")
+    else:
+        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
     return
 
 if __name__ == "__main__":
     startScheduler()
     restartJobManager()
-    atexit.register(postShutdownRequest)
-    app.run(host = '0.0.0.0', port = 2525, debug = False) #True
+    atexit.register(unloadScheduler)
+    app.run(host = '0.0.0.0', port = 2525, debug = True) #True
