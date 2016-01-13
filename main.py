@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 from flask import Flask, render_template, request, json
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
@@ -217,23 +218,33 @@ def actionManualwatering():
     response = 'watered plants.';
     return response
 
-def shutdownServer():
-    response = app.test_client().get('/shutdown')
+def postShutdownRequest():
+    response = app.test_client().post('/shutdown')
     return response
 
-@app.route('/shutdown', methods=['POST'])
-def shutdown():
+def prepareShutdown():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     scheduler.shutdown()
     print 'Shutting down flask...'
     func()
+    return
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    prepareShutdown()
     response = json.dumps({ 'success': 'true' })
     return response
+
+@app.route('/reboot', methods=['POST'])
+def reboot():
+    prepareShutdown()
+    os.system("reboot")
+    return
 
 if __name__ == "__main__":
     startScheduler()
     restartJobManager()
-    atexit.register(shutdownServer)
+    atexit.register(postShutdownRequest)
     app.run(host = '0.0.0.0', port = 2525, debug = False) #True
