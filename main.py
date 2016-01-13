@@ -229,7 +229,8 @@ def shutdown():
     scheduler.shutdown()
     print 'Shutting down flask...'
     func()
-    return
+    response = json.dumps({ 'success': 'true' })
+    return response
 
 if __name__ == "__main__":
     startScheduler()
