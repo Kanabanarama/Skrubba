@@ -17,6 +17,8 @@ scheduler = BackgroundScheduler(standalone = True)
 import logging
 logging.basicConfig()
 
+DEBUG = True
+
 def valveJob(setting): #(valve, onDuration)
     print 'OPENING VALVE'
     durationLeft = int(setting['on_duration'])
@@ -36,9 +38,12 @@ def valveJob(setting): #(valve, onDuration)
     return
 
 def startScheduler():
-    print 'Scheduler is running..'
-    scheduler.start()
-    scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+    # start scheduler if not already running (debug mode has 2 threads, so we have to make sure it only starts once)
+    if (not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true') and scheduler.running == False:
+        print 'Scheduler started..'
+        scheduler.start()
+        scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+        atexit.register(unloadScheduler)
     return
 
 def schedulerJobEventListener(event):
@@ -47,43 +52,32 @@ def schedulerJobEventListener(event):
     else:
         print('The scheduler job finished successfully.')
 
-
 def restartJobManager():
-    db = DB()
-    valveSettings = db.loadValveSettings()
+    if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        # Remove all jobs
+        if len(scheduler.get_jobs()) > 0:
+            for job in scheduler.get_jobs():
+                scheduler.remove_job(job.id)
 
-    #if scheduler.running == True:
-    #    scheduler.shutdown()
+        # Add all jobs that are stored in database
+        db = DB()
+        valveSettings = db.loadValveSettings()
+        for setting in valveSettings:
+            if setting['on_time'] and setting['on_duration'] and setting['is_active']:
+                timeComponents = map(int, setting['on_time'].split(':'))
+                timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
+                if(setting['interval_type'] == 'daily'):
+                    scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+                    print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
+                if(setting['interval_type'] == 'weekly'):
+                    scheduler.add_job(valveJob, 'cron', day_of_week = 'so', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+                    print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
+                if(setting['interval_type'] == 'monthly'):
+                    scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+                    print 'Scheduled monthly job [1st of the month %i:%i]' % (timeComponents[0], timeComponents[1])
 
-    # Remove all jobs
-    if len(scheduler.get_jobs()) > 0:
-        for job in scheduler.get_jobs():
-            scheduler.remove_job(job.id)
-
-    # Start scheduler if jobs are set and not already running
-    #if scheduler.running == False:
-    #    print 'Scheduler is running..'
-    #    scheduler.start()
-    #    scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
-
-    for setting in valveSettings:
-        if setting['on_time'] and setting['on_duration'] and setting['is_active']:
-            timeComponents = map(int, setting['on_time'].split(':'))
-            timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
-            #valveToOpen = int(setting['valve'])
-            #openingDuration = int(setting['on_duration'])
-            if(setting['interval_type'] == 'daily'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
-                print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
-            if(setting['interval_type'] == 'weekly'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'so', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
-                print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
-            if(setting['interval_type'] == 'monthly'):
-                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [setting])
-                print 'Scheduled monthly job [1st of the month %i:%i]' % (timeComponents[0], timeComponents[1])
-
-    print 'JOBS:'
-    print scheduler.get_jobs()
+        print 'JOBS:'
+        print scheduler.get_jobs()
     return
 
 @app.route("/", methods=['GET', 'POST'])
@@ -279,5 +273,4 @@ def shutdown():
 if __name__ == "__main__":
     startScheduler()
     restartJobManager()
-    atexit.register(unloadScheduler)
-    app.run(host = '0.0.0.0', port = 2525, debug = True) #True
+    app.run(host = '0.0.0.0', port = 2525, debug = DEBUG)
