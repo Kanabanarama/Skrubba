@@ -270,7 +270,11 @@ def shutdown():
         response = json.dumps({ 'success': 'false', 'message': 'access denied' })
     return
 
+from display import Display
+
 if __name__ == "__main__":
+    tft = Display()
+    tft.displayImage('static/gfx/lcd-skrubba.png', (67, 10), True)
     startScheduler()
     restartJobManager()
     app.run(host = '0.0.0.0', port = 2525, debug = DEBUG)
