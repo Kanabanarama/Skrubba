@@ -68,7 +68,7 @@ def restartJobManager():
                 scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
                 print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
             if(setting['interval_type'] == 'weekly'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'so', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'sun', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
                 print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
             if(setting['interval_type'] == 'monthly'):
                 scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [setting])
