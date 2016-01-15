@@ -47,11 +47,11 @@ class Display(object):
         pygame.display.flip()
         return
 
-    def displayText(self, text, size, (x, y), color, clearScreen):
-        if clearScreen:
-            screen.clear()
+    def displayText(self, text, size, (x, y), color, bgcolor):
         font = pygame.font.Font(None, size)
-        text = font.render(text, 0, color)
+        text = font.render(text, 1, color)
+        rect = text.get_rect()
+        pygame.draw.rect(self._screen, bgcolor, [x, y, rect.width, rect.height])
         self._screen.blit(text, (x, y))
         pygame.display.flip()
         return

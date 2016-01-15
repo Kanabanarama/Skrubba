@@ -48,8 +48,8 @@ def startScheduler():
 def schedulerJobEventListener(event):
     if event.exception:
         print('The scheduler job crashed.')
-    else:
-        print('The scheduler job finished successfully.')
+    #else:
+    #    print('The scheduler job finished successfully.')
 
 def restartJobManager():
     # Remove all jobs
@@ -77,6 +77,14 @@ def restartJobManager():
     print 'JOBS:'
     print scheduler.get_jobs()
     return
+
+def addTftJob():
+    def tftJob():
+        tft.displayText(time.strftime('%H:%M:%S'), 40, (205, 10), (255, 255, 255), (0, 110, 46))
+        return
+    scheduler.add_job(tftJob, 'interval', seconds = 1)
+    return
+
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
@@ -289,5 +297,5 @@ if __name__ == "__main__":
                 time.sleep(1)
             tft.clear()
             tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
-            tft.displayText(time.strftime('%H:%M:%S'), 20, (260, 10), (255, 255, 255), False)
+            addTftJob()
     app.run(host = '0.0.0.0', port = 2525, debug = DEBUG)
