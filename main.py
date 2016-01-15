@@ -289,4 +289,5 @@ if __name__ == "__main__":
                 time.sleep(1)
             tft.clear()
             tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
+            tft.displayText(time.strftime('%H:%M:%S'), 20, (260, 10), (255, 255, 255), False)
     app.run(host = '0.0.0.0', port = 2525, debug = DEBUG)

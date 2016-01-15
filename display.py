@@ -33,7 +33,6 @@ class Display(object):
 
     def clear(self):
         self._screen.fill(self._BGCOLOR)
-        pygame.display.flip()
         return
 
     def setBackgroundColor(self, (r, g, b)):
@@ -42,8 +41,17 @@ class Display(object):
 
     def displayImage(self, url, (x, y), clearScreen):
         if clearScreen:
-            self._screen.fill(self._BGCOLOR)
+            self.clear()
         image = pygame.image.load(url)
         self._screen.blit(image, (x, y))
+        pygame.display.flip()
+        return
+
+    def displayText(self, text, size, (x, y), color, clearScreen):
+        if clearScreen:
+            screen.clear()
+        font = pygame.font.Font(None, size)
+        text = font.render(text, 0, color)
+        self._screen.blit(text, (x, y))
         pygame.display.flip()
         return
