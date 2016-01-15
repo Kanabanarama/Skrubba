@@ -283,4 +283,6 @@ if __name__ == "__main__":
         if scheduler.running == False:
             startScheduler()
             restartJobManager()
+        if cpuArchitecture < 64:
+            tft.clear()
     app.run(host = '0.0.0.0', port = 2525, debug = DEBUG)

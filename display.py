@@ -17,6 +17,7 @@ import pygame
 class Display(object):
     _WIDTH = 320
     _HEIGHT = 240
+    _BGCOLOR = (255, 255, 255)
 
     def __init__(self):
         os.environ['SDL_FBDEV'] = '/dev/fb1'
@@ -30,9 +31,18 @@ class Display(object):
         # cleanup
         return
 
+    def clear(self):
+        self._screen.fill(self._BGCOLOR)
+        pygame.display.flip()
+        return
+
+    def setBackgroundColor(self, (r, g, b)):
+        self._BGCOLOR = (r, g, b)
+        return
+
     def displayImage(self, url, (x, y), clearScreen):
         if clearScreen:
-            self._screen.fill((255, 255, 255))
+            self._screen.fill(self._BGCOLOR)
         image = pygame.image.load(url)
         self._screen.blit(image, (x, y))
         pygame.display.flip()
