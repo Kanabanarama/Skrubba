@@ -280,9 +280,13 @@ if __name__ == "__main__":
         if cpuArchitecture < 64:
             tft = Display()
             tft.displayImage('static/gfx/lcd-skrubba-color.png', (67, 10), True)
+            displayTime = time.time()
         if scheduler.running == False:
             startScheduler()
             restartJobManager()
         if cpuArchitecture < 64:
+            while time.time() - displayTime < 5:
+                time.sleep(1)
             tft.clear()
+            tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
     app.run(host = '0.0.0.0', port = 2525, debug = DEBUG)
