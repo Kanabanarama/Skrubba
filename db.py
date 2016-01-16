@@ -33,18 +33,30 @@ class DB(object):
     def __createTables(self):
         print "Creating table..."
         createdTables = 0
+        self._cursor.execute('CREATE TABLE system(setting_name TEXT UNIQUE, setting_value TEXT);')
+        createdTables += self._cursor.rowcount
         self._cursor.execute('CREATE TABLE valve_settings(id INTEGER PRIMARY KEY, valve INTEGER UNIQUE, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
         createdTables += self._cursor.rowcount
         self._cursor.execute('CREATE TABLE valve_logs(settings_id INTEGER, valve INTEGER, on_time DATETIME, on_duration INTEGER, interval_type TEXT, last_on_date TEXT);')
         createdTables += self._cursor.rowcount
         #success = bool(self._cursor.rowcount)
-        success = (createdTables == 2)
+        success = (createdTables == 3)
         return success
 
-    #def query(self, query, params = None):
-    #    self._cursor.execute(query)
-    #    self._connection.commit()
-    #    return self._cursor
+    def updateSystemSettings(self, settingName, settingValue):
+        print 'UPDATE SYSTEM CONFIG: %s = %s' % (settingName, settingValue)
+        success = self._cursor.execute('INSERT OR REPLACE INTO system (setting_name, setting_value) VALUES ((?), (?));', (settingName, settingValue))
+        self._connection.commit()
+        return success
+
+    def loadSystemSettings(self):
+        rows = []
+        self._cursor.execute('SELECT * FROM system')
+        for row in self._cursor:
+            print row
+            rowDict = dict(itertools.izip(row.keys(), row))
+            rows.append(rowDict)
+        return rows
 
     def addValveSetting(self, name, onTime, onDuration, intervalType):
         # find first available valve

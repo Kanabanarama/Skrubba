@@ -215,10 +215,35 @@ def actionManualwatering():
         valves = Shiftregister()
         valves.outputBinary(valveNo)
         print "opened valve %i" % valveNo
-    response = 'watered plants.';
+    response = json.dumps({ 'success': 'true' })
     return response
 
-import socket
+@app.route("/data/setting.json", methods=['GET', 'POST'])
+def setting():
+    db = DB()
+    action = request.args.get('action')
+    if action == 'read':
+        settings = []
+        print 'READ SYSTEM CONF:'
+        for line in db.loadSystemSettings():
+            # TODO: use same identifiers in backend and frontend...
+            if line['setting_name'] == 'valve_amount':
+                setting = { 'valveAmount': line['setting_value'] }
+            settings.append(setting)
+        response = json.dumps({ 'setting': settings })
+        print response
+    return response
+
+@app.route("/actions/configure", methods=['GET', 'POST'])
+def actionConfigure():
+    if request.method == 'POST':
+        params = request.get_json();
+        valveAmount = params['valve_amount']
+        print "Set config option [valve amount] to: %i" % valveAmount
+        db = DB()
+        db.updateSystemSettings('valve_amount', valveAmount)
+    response = json.dumps({ 'success': 'true' })
+    return response
 
 def checkLocalAccess():
     print 'checking access:'
