@@ -127,22 +127,11 @@ def plant():
     action = request.args.get('action')
 
     if action == 'read':
-        plants = []
         valveConfigs = db.loadValveConfigs()
         print 'READ VALVE CONFIG:'
         print valveConfigs
         #if(valveConfigs):
-        for config in valveConfigs:
-            plant = {}
-            plant['id'] = config['id']
-            plant['valve'] = config['valve']
-            plant['name'] = config['name']
-            plant['onTime'] = config['on_time']
-            plant['onDuration'] = config['on_duration']
-            plant['intervalType'] = config['interval_type']
-            plant['isActive'] = config['is_active']
-            plants.append(plant)
-        response = json.dumps({'plant':plants})
+        response = json.dumps({ 'plant': valveConfigs })
         #else:
         #    plants.append({'valve': 1, 'name': 'Glückskastanie (Pachira aquatica)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'daily', 'measures':[40,30,20,60,20,50,10], 'isActive': 1 })
         #    plants.append({'valve': 2, 'name': 'Elefantenfuß (Beaucarnea recurvata)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures':[40,30,30,40,40,30,40], 'isActive': 1})
@@ -155,7 +144,7 @@ def plant():
         valveConfig = json.loads(jsonValveConfigs)
         print 'CREATED VALVE CONFIG:'
         print valveConfig
-        newRow = db.addValveConfig(valveConfig['name'], valveConfig['onTime'], valveConfig['onDuration'], valveConfig['intervalType'])
+        newRow = db.addValveConfig(valveConfig)
 
         if len(newRow):
             restartJobManager()
@@ -169,7 +158,7 @@ def plant():
         valveConfig = json.loads(jsonValveConfigs)
         print 'UPDATED VALVE CONFIG:'
         print valveConfig
-        success = db.saveValveConfig(valveConfig['id'], valveConfig['valve'], valveConfig['name'], valveConfig['onTime'], valveConfig['onDuration'], valveConfig['intervalType'], valveConfig['isActive'])
+        success = db.saveValveConfig(valveConfig)
         if success == True:
             restartJobManager()
             responseObj = { 'success': 'true' }
@@ -193,16 +182,9 @@ def log():
     db = DB()
     action = request.args.get('action')
     if action == 'read':
-        logs = []
+        logs = db.loadLogs()
         print 'READ LOGS:'
-        for line in db.loadLogs():
-            log = {}
-            #log['id'] = line['id']
-            log['valve'] = line['valve']
-            log['name'] = line['name']
-            log['intervalType'] = line['interval_type']
-            log['lastOnDate'] = line['last_on_date']
-            logs.append(log)
+        print logs
         response = json.dumps({ 'log': logs })
     return response
 
@@ -226,9 +208,7 @@ def setting():
         settings = []
         print 'READ SYSTEM CONF:'
         for line in db.loadSystemSettings():
-            # TODO: use same identifiers in backend and frontend...
-            if line['setting_name'] == 'valve_amount':
-                setting = { 'valveAmount': line['setting_value'] }
+            setting = { line['setting_name']: line['setting_value'] }
             settings.append(setting)
         response = json.dumps({ 'setting': settings })
         print response

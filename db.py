@@ -37,7 +37,7 @@ class DB(object):
         createdTables += self._cursor.rowcount
         self._cursor.execute('CREATE TABLE valve_configs(id INTEGER PRIMARY KEY, valve INTEGER UNIQUE, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
         createdTables += self._cursor.rowcount
-        self._cursor.execute('CREATE TABLE valve_logs(settings_id INTEGER, valve INTEGER, on_time DATETIME, on_duration INTEGER, interval_type TEXT, last_on_date TEXT);')
+        self._cursor.execute('CREATE TABLE valve_logs(valve_config_id INTEGER, valve INTEGER, on_time DATETIME, on_duration INTEGER, interval_type TEXT, last_on_date TEXT);')
         createdTables += self._cursor.rowcount
         #success = bool(self._cursor.rowcount)
         success = (createdTables == 3)
@@ -58,23 +58,26 @@ class DB(object):
             rows.append(rowDict)
         return rows
 
-    def addValveConfig(self, name, onTime, onDuration, intervalType):
+    def addValveConfig(self, config):
         # find first available valve
-        self._cursor.execute('SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL')
+        sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL'
+        self._cursor.execute(sql)
         nextUnusedValve = self._cursor.fetchone()
         if nextUnusedValve is not None:
             #print int(re.search(r'\d+', nextUnusedValve).group())
             nextUnusedValve = nextUnusedValve[0]
         else:
             nextUnusedValve = 1
-        success = self._cursor.execute('INSERT INTO valve_configs(valve, name, on_time, on_duration, interval_type) VALUES((?), (?), (?), (?), (?));', (nextUnusedValve, name, onTime, onDuration, 'daily'))
+        sql = 'INSERT INTO valve_configs(valve, name, on_time, on_duration, interval_type) VALUES((?), (?), (?), (?), (?));'
+        success = self._cursor.execute(sql, (nextUnusedValve, config['name'], config['on_time'], config['on_duration'], config['interval_type']))
         self._connection.commit()
         row = [{ 'id': self._cursor.lastrowid, 'valve': nextUnusedValve }]
         return row
 
-    def saveValveConfig(self, id, valve, name, onTime, onDuration, intervalType, isActive):
+    def saveValveConfig(self, config): #id, valve, name, onTime, onDuration, intervalType, isActive
         try:
-            success = self._cursor.execute('UPDATE valve_configs set valve = (?), name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE id = (?);', (valve, name, onTime, onDuration, intervalType, isActive, id))
+            sql = 'UPDATE valve_configs set valve = (?), name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE id = (?);'
+            success = self._cursor.execute(sql, (config['valve'], config['name'], config['on_time'], config['on_duration'], config['interval_type'], config['is_active'], config['id']))
             self._connection.commit()
             success = True
         except sqlite3.IntegrityError:
@@ -95,11 +98,12 @@ class DB(object):
             rows.append(rowDict)
         return rows
 
-    def addLogLine(self, valveInfo, onDate):
+    def addLogLine(self, data, logDate):
         print 'ADDING LOG LINE:'
         print valveInfo
         print onDate
-        success = self._cursor.execute('INSERT INTO valve_logs(config_id, valve, on_time, on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), (?), (?));', (valveInfo['id'], valveInfo['valve'], valveInfo['on_time'], valveInfo['on_duration'], valveInfo['interval_type'], onDate))
+        sql = 'INSERT INTO valve_logs(valve_config_id, valve, on_time, on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), (?), (?));'
+        success = self._cursor.execute(sql, (data['id'], data['valve'], data['on_time'], data['on_duration'], data['interval_type'], logDate))
         self._connection.commit()
         print 'LINES ADDED: %i' % self._cursor.rowcount
         row = [{ 'id': self._cursor.lastrowid }]
@@ -107,7 +111,7 @@ class DB(object):
 
     def loadLogs(self):
         rows = []
-        self._cursor.execute('SELECT * FROM valve_logs LEFT JOIN valve_configs ON valve_logs.valve = valve_configs.valve')
+        self._cursor.execute('SELECT * FROM valve_logs LEFT JOIN valve_configs ON valve_logs.valve_config_id = valve_configs.valve_config_id')
         for row in self._cursor:
             print row
             rowDict = dict(itertools.izip(row.keys(), row))
