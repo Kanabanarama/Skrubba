@@ -59,19 +59,19 @@ def restartJobManager():
 
     # Add all jobs that are stored in database
     db = DB()
-    valveSettings = db.loadValveSettings()
-    for setting in valveSettings:
-        if setting['on_time'] and setting['on_duration'] and setting['is_active']:
-            timeComponents = map(int, setting['on_time'].split(':'))
+    valveConfigs = db.loadValveConfigs()
+    for config in valveConfigs:
+        if config['on_time'] and config['on_duration'] and config['is_active']:
+            timeComponents = map(int, config['on_time'].split(':'))
             timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
-            if(setting['interval_type'] == 'daily'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+            if(config['interval_type'] == 'daily'):
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [config])
                 print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
-            if(setting['interval_type'] == 'weekly'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'sun', hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+            if(config['interval_type'] == 'weekly'):
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'sun', hour = timeComponents[0], minute = timeComponents[1], args = [config])
                 print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
-            if(setting['interval_type'] == 'monthly'):
-                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [setting])
+            if(config['interval_type'] == 'monthly'):
+                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [config])
                 print 'Scheduled monthly job [1st of the month %i:%i]' % (timeComponents[0], timeComponents[1])
 
     print 'JOBS:'
@@ -95,14 +95,14 @@ def index():
 
     message = "Hello Web!"
 
-    inputDefault = '{"type":"setting","valveStates":[0,0,0,0,0,0,0,0]}'
+    inputDefault = '{"type":"config","valveStates":[0,0,0,0,0,0,0,0]}'
 
     if request.method == 'POST':
-        jsonValveSettings = request.form['valve']
-        inputDefault = jsonValveSettings
-        valveSettings = json.loads(jsonValveSettings)
-        if valveSettings['type'] == 'setting':
-            valveStates = valveSettings['valveStates']
+        jsonValveConfigs = request.form['valve']
+        inputDefault = jsonValveConfigs
+        valveConfigs = json.loads(jsonValveConfigs)
+        if valveConfigs['type'] == 'config':
+            valveStates = valveConfigs['valveStates']
             binaryValue = 0
             for i in range(0,8):
                 if valveStates[i] == 1:
@@ -110,12 +110,12 @@ def index():
             valves = Shiftregister()
             valves.outputBinary(binaryValue)
         else:
-            message = "Type \"%s\" is not defined." % valveSettings['type']
+            message = "Type \"%s\" is not defined." % valveConfigs['type']
 
     templateData = {
         'title': 'Skrubba',
         'message': message,
-        'settings': inputDefault
+        'config': inputDefault
     }
     return render_template('main.html', **templateData)
 
@@ -128,19 +128,19 @@ def plant():
 
     if action == 'read':
         plants = []
-        valveSettings = db.loadValveSettings()
-        print 'READ SETTINGS:'
-        print valveSettings
-        #if(valveSettings):
-        for setting in valveSettings:
+        valveConfigs = db.loadValveConfigs()
+        print 'READ VALVE CONFIG:'
+        print valveConfigs
+        #if(valveConfigs):
+        for config in valveConfigs:
             plant = {}
-            plant['id'] = setting['id']
-            plant['valve'] = setting['valve']
-            plant['name'] = setting['name']
-            plant['onTime'] = setting['on_time']
-            plant['onDuration'] = setting['on_duration']
-            plant['intervalType'] = setting['interval_type']
-            plant['isActive'] = setting['is_active']
+            plant['id'] = config['id']
+            plant['valve'] = config['valve']
+            plant['name'] = config['name']
+            plant['onTime'] = config['on_time']
+            plant['onDuration'] = config['on_duration']
+            plant['intervalType'] = config['interval_type']
+            plant['isActive'] = config['is_active']
             plants.append(plant)
         response = json.dumps({'plant':plants})
         #else:
@@ -151,11 +151,11 @@ def plant():
         #    response = json.dumps({'plant':[]})
 
     elif action == 'create':
-        jsonValveSettings = request.form['plant']
-        valveSetting = json.loads(jsonValveSettings)
-        print 'CREATED SETTINGS:'
-        print valveSetting
-        newRow = db.addValveSetting(valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'])
+        jsonValveConfigs = request.form['plant']
+        valveConfig = json.loads(jsonValveConfigs)
+        print 'CREATED VALVE CONFIG:'
+        print valveConfig
+        newRow = db.addValveConfig(valveConfig['name'], valveConfig['onTime'], valveConfig['onDuration'], valveConfig['intervalType'])
 
         if len(newRow):
             restartJobManager()
@@ -165,11 +165,11 @@ def plant():
         response = json.dumps(responseObj)
 
     elif action == 'update':
-        jsonValveSettings = request.form['plant']
-        valveSetting = json.loads(jsonValveSettings)
-        print 'UPDATED SETTINGS:'
-        #print valveSetting
-        success = db.saveValveSetting(valveSetting['id'], valveSetting['valve'], valveSetting['name'], valveSetting['onTime'], valveSetting['onDuration'], valveSetting['intervalType'], valveSetting['isActive'])
+        jsonValveConfigs = request.form['plant']
+        valveConfig = json.loads(jsonValveConfigs)
+        print 'UPDATED VALVE CONFIG:'
+        print valveConfig
+        success = db.saveValveConfig(valveConfig['id'], valveConfig['valve'], valveConfig['name'], valveConfig['onTime'], valveConfig['onDuration'], valveConfig['intervalType'], valveConfig['isActive'])
         if success == True:
             restartJobManager()
             responseObj = { 'success': 'true' }
@@ -178,11 +178,11 @@ def plant():
         response = json.dumps(responseObj)#{'success': 'false', 'message': }#, 500 #'metaData': { 'messageProperty': 'msg', 'successProperty': 'success' }
 
     elif action == 'destroy':
-        jsonValveSettings = request.form['plant']
-        valveSetting = json.loads(jsonValveSettings)
-        print 'DELETED SETTINGS:'
-        print valveSetting
-        success = db.deleteValveSetting(valveSetting['id'])
+        jsonValveConfigs = request.form['plant']
+        valveConfig = json.loads(jsonValveConfig)
+        print 'DELETED VALVE CONFIG:'
+        print valveConfig
+        success = db.deleteValveConfig(valveConfig['id'])
         restartJobManager()
         response = json.dumps({ 'success': str(success).lower() })
 
