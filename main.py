@@ -224,11 +224,16 @@ def setting():
 def actionConfigure():
     if request.method == 'POST':
         params = request.get_json();
-        valveAmount = params['valve_amount']
-        print "Set config option [valve amount] to: %i" % valveAmount
+        valveAmount = int(params['valve_amount'])
         db = DB()
-        db.updateSystemSettings('valve_amount', valveAmount)
-    response = json.dumps({ 'success': 'true' })
+        actualValves = db.getValveCount()
+        if actualValves <= valveAmount:
+            print actualValves
+            print valveAmount
+            db.updateSystemSettings('valve_amount', valveAmount)
+            response = json.dumps({ 'success': 'true' })
+        else:
+            response = json.dumps({ 'success': 'false', 'message': 'There are more valves set up than you want to allow. Please remove some of them first.' })
     return response
 
 def checkLocalAccess():
