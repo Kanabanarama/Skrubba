@@ -194,7 +194,7 @@ def log():
         response = json.dumps({ 'log': logs })
     return response
 
-@app.route("/actions/manualwatering", methods=['GET', 'POST'])
+@app.route("/action/manualwatering", methods=['GET', 'POST'])
 def actionManualwatering():
     if request.method == 'POST':
         params = request.get_json();
@@ -211,29 +211,46 @@ def setting():
     db = DB()
     action = request.args.get('action')
     if action == 'read':
-        settings = []
+        settings = {}
         print 'READ SYSTEM CONF:'
         for line in db.loadSystemSettings():
-            setting = { line['setting_name']: line['setting_value'] }
-            settings.append(setting)
-        response = json.dumps({ 'setting': settings })
+            if line['setting_name'] == 'password':
+                continue
+            settings.update({ line['setting_name']: line['setting_value'] })
+        response = json.dumps({ 'setting': [settings] })
         print response
     return response
 
-@app.route("/actions/configure", methods=['GET', 'POST'])
-def actionConfigure():
-    if request.method == 'POST':
+@app.route("/set/maxvalves", methods=['GET', 'POST'])
+def setMaxvalves():
+    if request.method == 'POST' and checkLocalAccess() == True:
         params = request.get_json();
         valveAmount = int(params['valve_amount'])
-        db = DB()
-        actualValves = db.getValveCount()
-        if actualValves <= valveAmount:
-            print actualValves
-            print valveAmount
-            db.updateSystemSettings('valve_amount', valveAmount)
+        if valveAmount:
+            actualValves = db.getValveCount()
+            if actualValves <= valveAmount:
+                print actualValves
+                print valveAmount
+                db = DB()
+                db.updateSystemSettings('valve_amount', valveAmount)
+                response = json.dumps({ 'success': 'true' })
+            else:
+                response = json.dumps({ 'success': 'false', 'message': 'There are more valves set up than you want to allow. Please remove some of them first.' })
+    return response
+
+@app.route("/set/credentials", methods=['GET', 'POST'])
+def setCredentials():
+    if request.method == 'POST' and checkLocalAccess() == True:
+        params = request.get_json();
+        credentialUsername = params['username']
+        credentialPassword = params['password']
+        if credentialUsername and credentialPassword:
+            db = DB()
+            db.updateSystemSettings('username', credentialUsername)
+            db.updateSystemSettings('password', credentialPassword)
             response = json.dumps({ 'success': 'true' })
         else:
-            response = json.dumps({ 'success': 'false', 'message': 'There are more valves set up than you want to allow. Please remove some of them first.' })
+            response = json.dumps({ 'success': 'false' })
     return response
 
 def checkLocalAccess():
@@ -261,7 +278,7 @@ def unloadFlask():
     func()
     return
 
-@app.route('/serveroff', methods=['POST'])
+@app.route('/action/serveroff', methods=['POST'])
 def serveroff():
     print 'SERVER SHUTTING DOWN'
     if checkLocalAccess() == True:
@@ -272,7 +289,7 @@ def serveroff():
         response = json.dumps({ 'success': 'false', 'message': 'access denied' })
     return response
 
-@app.route('/reboot', methods=['POST'])
+@app.route('/action/reboot', methods=['POST'])
 def reboot():
     if checkLocalAccess() == True:
         #unloadScheduler()
@@ -282,7 +299,7 @@ def reboot():
         response = json.dumps({ 'success': 'false', 'message': 'access denied' })
     return
 
-@app.route('/shutdown', methods=['POST'])
+@app.route('/action/shutdown', methods=['POST'])
 def shutdown():
     if checkLocalAccess() == True:
         #unloadScheduler()
