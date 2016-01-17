@@ -142,15 +142,21 @@ def plant():
     elif action == 'create':
         jsonValveConfigs = request.form['plant']
         valveConfig = json.loads(jsonValveConfigs)
-        print 'CREATED VALVE CONFIG:'
-        print valveConfig
-        newRow = db.addValveConfig(valveConfig)
 
-        if len(newRow):
-            restartJobManager()
-            responseObj = { 'success': 'true', 'plant': newRow }
+        # check if valves can be added (system_settings.valve_amount)
+        maxValves = db.getMaxValveCountSetting()
+        actualValves = db.getValveCount()
+        if not maxValves or actualValves < maxValves:
+            print 'CREATED VALVE CONFIG:'
+            print valveConfig
+            newRow = db.addValveConfig(valveConfig)
+            if len(newRow):
+                restartJobManager()
+                responseObj = { 'success': 'true', 'plant': newRow }
+            else:
+                responseObj = { 'success': 'false' }
         else:
-            responseObj = { 'success': 'false' }
+            responseObj = { 'success': 'false', 'message': 'No more entrys to add, maximum entries can be configured in settings.' }
         response = json.dumps(responseObj)
 
     elif action == 'update':
@@ -168,7 +174,7 @@ def plant():
 
     elif action == 'destroy':
         jsonValveConfigs = request.form['plant']
-        valveConfig = json.loads(jsonValveConfig)
+        valveConfig = json.loads(jsonValveConfigs)
         print 'DELETED VALVE CONFIG:'
         print valveConfig
         success = db.deleteValveConfig(valveConfig['id'])

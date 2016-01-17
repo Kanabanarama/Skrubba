@@ -45,22 +45,34 @@ class DB(object):
 
     def updateSystemSettings(self, settingName, settingValue):
         print 'UPDATE SYSTEM SETTINGS: %s = %s' % (settingName, settingValue)
-        success = self._cursor.execute('INSERT OR REPLACE INTO system_settings (setting_name, setting_value) VALUES ((?), (?));', (settingName, settingValue))
+        sql = 'INSERT OR REPLACE INTO system_settings (setting_name, setting_value) VALUES ((?), (?));'
+        success = self._cursor.execute(sql, (settingName, settingValue))
         self._connection.commit()
         return success
 
     def loadSystemSettings(self):
         rows = []
-        self._cursor.execute('SELECT * FROM system_settings')
+        self._cursor.execute('SELECT * FROM system_settings;')
         for row in self._cursor:
             print row
             rowDict = dict(itertools.izip(row.keys(), row))
             rows.append(rowDict)
         return rows
 
+    def getValveCount(self):
+        sql = 'SELECT COUNT(*) AS count FROM valve_configs;'
+        self._cursor.execute(sql)
+        valveCount = self._cursor.fetchone()
+        return int(valveCount[0])
+
+    def getMaxValveCountSetting(self):
+        sql = 'SELECT setting_value FROM system_settings WHERE setting_name = "valve_amount";'
+        self._cursor.execute(sql)
+        valveMaxCount = self._cursor.fetchone()
+        return int(valveMaxCount[0])
+
     def addValveConfig(self, config):
-        # find first available valve
-        sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL'
+        sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL;'
         self._cursor.execute(sql)
         nextUnusedValve = self._cursor.fetchone()
         if nextUnusedValve is not None:
@@ -111,7 +123,7 @@ class DB(object):
 
     def loadLogs(self):
         rows = []
-        self._cursor.execute('SELECT * FROM valve_logs LEFT JOIN valve_configs ON valve_logs.valve_config_id = valve_configs.valve_config_id')
+        self._cursor.execute('SELECT * FROM valve_logs LEFT JOIN valve_configs ON (valve_logs.valve_config_id = valve_configs.valve_config_id);')
         for row in self._cursor:
             print row
             rowDict = dict(itertools.izip(row.keys(), row))
