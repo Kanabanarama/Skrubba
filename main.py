@@ -253,6 +253,29 @@ def setCredentials():
             response = json.dumps({ 'success': 'false' })
     return response
 
+@app.route("/action/login", methods=['GET', 'POST'])
+def actionLogin():
+    if request.method == 'POST':
+        params = request.get_json();
+        requestUsername = params['username']
+        requestPassword = params['password']
+
+        systemCredentials = {}
+        db = DB()
+        for line in db.loadSystemSettings():
+            if line['setting_name'] == 'username':
+                systemCredentials['username'] = line['setting_value']
+            if line['setting_name'] == 'password':
+                systemCredentials['password'] = line['setting_value']
+
+        if len(systemCredentials) == 2 and requestUsername == systemCredentials['username'] and requestPassword == systemCredentials['password']:
+            print 'Login successful'
+            response = json.dumps({ 'success': 'true' })
+        else:
+            print 'Login failed'
+            response = json.dumps({ 'success': 'false', 'message': 'Invalid login.' })
+    return response
+
 def checkLocalAccess():
     print 'checking access:'
     requestIp = request.remote_addr
