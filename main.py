@@ -240,6 +240,18 @@ def setting():
                     response = json.dumps({ 'success': 'true' })
                 else:
                     response = json.dumps({ 'success': 'false', 'message': 'There are more valves set up than you want to allow. Please remove some of them first.' })
+    elif action == 'destroy':
+        if request.method == 'POST' and checkLocalAccess() == True:
+            jsonCredentials = request.form['setting']
+            params = json.loads(jsonCredentials)
+            print params
+            #for setting in params:
+            for key, value in params.items():
+                print 'checking: %s / %s' % (key, value)
+                if value == '-DELETE-':
+                    db.deleteSystemSetting(key)
+            response = json.dumps({ 'success': 'true' })
+
     return response
 
 @app.route("/action/login", methods=['GET', 'POST'])

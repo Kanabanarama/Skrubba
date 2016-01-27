@@ -50,6 +50,13 @@ class DB(object):
         self._connection.commit()
         return success
 
+    def deleteSystemSetting(self, settingName):
+        print 'DELETE SYSTEM SETTING: %s' % settingName
+        sql = 'DELETE FROM system_settings WHERE setting_name = (?);'
+        success = self._cursor.execute(sql, (settingName,))
+        self._connection.commit()
+        return success
+
     def loadSystemSettings(self):
         rows = []
         self._cursor.execute('SELECT * FROM system_settings;')
