@@ -60,16 +60,20 @@ class DB(object):
         return rows
 
     def getValveCount(self):
-        sql = 'SELECT COUNT(*) AS count FROM valve_configs;'
+        sql = 'SELECT IFNULL(COUNT(*), 0) AS count FROM valve_configs;'
         self._cursor.execute(sql)
-        valveCount = self._cursor.fetchone()
-        return int(valveCount[0])
+        result = self._cursor.fetchone()
+        valveCount = int(result[0])
+        print 'getValveCount: %i' % valveCount
+        return valveCount
 
     def getMaxValveCountSetting(self):
-        sql = 'SELECT setting_value FROM system_settings WHERE setting_name = "valve_amount";'
+        sql = 'SELECT IFNULL(setting_value, 99) FROM system_settings WHERE setting_name = "valve_amount";'
         self._cursor.execute(sql)
-        valveMaxCount = self._cursor.fetchone()
-        return int(valveMaxCount[0])
+        result = self._cursor.fetchone()
+        valveMaxCount = int(result[0])
+        print 'getMaxValveCountSetting: %i' % valveMaxCount
+        return valveMaxCount
 
     def addValveConfig(self, config):
         sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL;'

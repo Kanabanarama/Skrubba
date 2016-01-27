@@ -219,38 +219,27 @@ def setting():
             settings.update({ line['setting_name']: line['setting_value'] })
         response = json.dumps({ 'setting': [settings] })
         print response
-    return response
-
-@app.route("/set/maxvalves", methods=['GET', 'POST'])
-def setMaxvalves():
-    if request.method == 'POST' and checkLocalAccess() == True:
-        params = request.get_json();
-        valveAmount = int(params['valve_amount'])
-        if valveAmount:
-            actualValves = db.getValveCount()
-            if actualValves <= valveAmount:
-                print actualValves
-                print valveAmount
-                db = DB()
-                db.updateSystemSettings('valve_amount', valveAmount)
-                response = json.dumps({ 'success': 'true' })
-            else:
-                response = json.dumps({ 'success': 'false', 'message': 'There are more valves set up than you want to allow. Please remove some of them first.' })
-    return response
-
-@app.route("/set/credentials", methods=['GET', 'POST'])
-def setCredentials():
-    if request.method == 'POST' and checkLocalAccess() == True:
-        params = request.get_json();
-        credentialUsername = params['username']
-        credentialPassword = params['password']
-        if credentialUsername and credentialPassword:
-            db = DB()
-            db.updateSystemSettings('username', credentialUsername)
-            db.updateSystemSettings('password', credentialPassword)
-            response = json.dumps({ 'success': 'true' })
-        else:
+    elif action == 'update':
+        if request.method == 'POST' and checkLocalAccess() == True:
+            jsonCredentials = request.form['setting']
+            params = json.loads(jsonCredentials)
             response = json.dumps({ 'success': 'false' })
+            if 'username' in params:
+                credentialUsername = params['username']
+                db.updateSystemSettings('username', credentialUsername)
+                response = json.dumps({ 'success': 'true' })
+            if 'password' in params:
+                credentialPassword = params['password']
+                db.updateSystemSettings('password', credentialPassword)
+                response = json.dumps({ 'success': 'true' })
+            if 'valve_amount' in params:
+                valveAmount = int(params['valve_amount'])
+                actualValves = db.getValveCount()
+                if actualValves <= valveAmount:
+                    db.updateSystemSettings('valve_amount', valveAmount)
+                    response = json.dumps({ 'success': 'true' })
+                else:
+                    response = json.dumps({ 'success': 'false', 'message': 'There are more valves set up than you want to allow. Please remove some of them first.' })
     return response
 
 @app.route("/action/login", methods=['GET', 'POST'])
