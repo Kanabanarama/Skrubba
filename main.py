@@ -108,10 +108,9 @@ def requires_auth(f):
         print 'authToken: %s / Token validation result: %i' % (headerAuthToken, checkAuthToken(headerAuthToken))
         if not headerAuthToken or not checkAuthToken(headerAuthToken):
             print 'return denyAccess()'
-            return denyAccess()
+            return denyAccessToken()
         print 'return f()'
         return f(*args, **kwargs)
-        print decorated
     return decorated
 
 def generateAuthToken(self, credentials, expiration = tokenExpiration):
@@ -129,7 +128,7 @@ def checkAuthToken(authToken):
         return False # invalid token
     return True
 
-def denyAccess():
+def denyAccessToken():
     return json.dumps({ 'success': 'false', 'message': 'Authentication failed.' })
 
 @app.route("/action/login", methods=['GET', 'POST'])
@@ -156,12 +155,25 @@ def actionLogin():
             response = json.dumps({ 'success': 'false', 'message': 'Invalid login.' })
     return response
 
-def checkLocalAccess():
-    requestIp = request.remote_addr
-    print 'checking request origin: %s' % requestIp
-    allowed = (requestIp == '127.0.0.1')
-    print 'allowed: %i' % allowed
-    return allowed
+def localhost_only(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        requestIp = request.remote_addr
+        print 'checking request origin: %s' % requestIp
+        if DEBUG:
+            allowed = True
+        else:
+            allowed = (requestIp == '127.0.0.1')
+        print 'allowed: %i' % allowed
+        if not allowed:
+            print 'return denyIp()'
+            return denyRequestIp()
+        print 'return f()'
+        return f(*args, **kwargs)
+    return decorated
+
+def denyRequestIp():
+    return json.dumps({ 'success': 'false', 'message': 'Requests from remote hosts are not allowed.' })
 
 ########################################################################################################################
 # Flask CRUD routes
@@ -169,6 +181,7 @@ def checkLocalAccess():
 
 @app.route("/data/plant.json", methods=['GET', 'POST'])
 @requires_auth
+@localhost_only
 def plant():
     db = DB()
     action = request.args.get('action')
@@ -224,6 +237,7 @@ def plant():
 
 @app.route("/data/log.json", methods=['GET', 'POST'])
 @requires_auth
+@localhost_only
 def log():
     db = DB()
     action = request.args.get('action')
@@ -236,6 +250,7 @@ def log():
 
 @app.route("/data/setting.json", methods=['GET', 'POST'])
 @requires_auth
+@localhost_only
 def setting():
     db = DB()
     action = request.args.get('action')
@@ -249,7 +264,7 @@ def setting():
         response = json.dumps({ 'setting': [settings] })
         print response
     elif action == 'update':
-        if request.method == 'POST' and checkLocalAccess() == True:
+        if request.method == 'POST':
             jsonCredentials = request.form['setting']
             params = json.loads(jsonCredentials)
             response = json.dumps({ 'success': 'false' })
@@ -270,7 +285,7 @@ def setting():
                 else:
                     response = json.dumps({ 'success': 'false', 'message': 'There are more valves set up than you want to allow. Please remove some of them first.' })
     elif action == 'destroy':
-        if request.method == 'POST' and checkLocalAccess() == True:
+        if request.method == 'POST':
             jsonCredentials = request.form['setting']
             params = json.loads(jsonCredentials)
             print params
@@ -288,6 +303,7 @@ def setting():
 
 @app.route("/action/manualwatering", methods=['GET', 'POST'])
 @requires_auth
+@localhost_only
 def actionManualwatering():
     if request.method == 'POST':
         params = request.get_json();
@@ -302,37 +318,32 @@ def actionManualwatering():
 
 @app.route('/action/serveroff', methods=['POST'])
 @requires_auth
+@localhost_only
 def serveroff():
     print 'SERVER SHUTTING DOWN'
-    if checkLocalAccess() == True:
-        #unloadScheduler()
-        unloadFlask()
-        response = json.dumps({ 'success': 'true' })
-    else:
-        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
-    return response
+    #unloadScheduler()
+    unloadFlask()
+    return json.dumps({ 'success': 'true' })
 
 @app.route('/action/reboot', methods=['POST'])
 @requires_auth
+@localhost_only
 def reboot():
-    if checkLocalAccess() == True:
-        #unloadScheduler()
-        unloadFlask()
-        os.system("reboot")
-    else:
-        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
-    return
+    print 'SYSTEM REBOOTING'
+    #unloadScheduler()
+    unloadFlask()
+    os.system("reboot")
+    return json.dumps({ 'success': 'true' })
 
 @app.route('/action/shutdown', methods=['POST'])
 @requires_auth
+@localhost_only
 def shutdown():
-    if checkLocalAccess() == True:
-        #unloadScheduler()
-        unloadFlask()
-        os.system("poweroff")
-    else:
-        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
-    return
+    print 'SYSTEM SHUTDOWN'
+    #unloadScheduler()
+    unloadFlask()
+    os.system("poweroff")
+    return json.dumps({ 'success': 'true' })
 
 ########################################################################################################################
 # Unloading
