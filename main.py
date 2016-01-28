@@ -68,12 +68,14 @@ def restartJobManager():
     if len(scheduler.get_jobs()) > 0:
         for job in scheduler.get_jobs():
             scheduler.remove_job(job.id)
+        tft.clearJobDisplay()
 
     # Add all jobs that are stored in database
     db = DB()
     valveConfigs = db.loadValveConfigs()
     for config in valveConfigs:
         if config['on_time'] and config['on_duration'] and config['is_active']:
+            tft.displayJob(config)
             timeComponents = map(int, config['on_time'].split(':'))
             timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
             if(config['interval_type'] == 'daily'):
@@ -93,6 +95,7 @@ def restartJobManager():
 def addTftJob():
     def tftJob():
         tft.displayText(time.strftime('%H:%M:%S'), 40, (205, 10), (255, 255, 255), (0, 110, 46))
+        tft.updateJobDisplay()
         return
     scheduler.add_job(tftJob, 'interval', seconds = 1)
     return
