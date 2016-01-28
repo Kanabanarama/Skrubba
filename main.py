@@ -1,18 +1,30 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
+import os, struct, time, atexit
+from functools import wraps
+from datetime import datetime
 from flask import Flask, render_template, request, json
+from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer, BadSignature, SignatureExpired)
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 from shiftregister import Shiftregister
 from db import DB
-from datetime import datetime
-import time
-import atexit
+
+# because there is no 64 bit version of pygame and the display is installed
+# on the raspberry pi, not on the development system, omit the import
+cpuArchitecture = struct.calcsize('P') * 8
+if cpuArchitecture < 64:
+    from display import Display
 
 app = Flask(__name__, template_folder = 'templates')
+app.secret_key = os.urandom(32)
+tokenExpiration = 7200
 scheduler = BackgroundScheduler(standalone = True)
+
+########################################################################################################################
+# Scheduler
+########################################################################################################################
 
 import logging
 logging.basicConfig()
@@ -85,64 +97,91 @@ def addTftJob():
     scheduler.add_job(tftJob, 'interval', seconds = 1)
     return
 
+########################################################################################################################
+# Authentication
+########################################################################################################################
 
-@app.route("/", methods=['GET', 'POST'])
-def index():
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        headerAuthToken = request.headers.get('authentication')
+        print 'authToken: %s / Token validation result: %i' % (headerAuthToken, checkAuthToken(headerAuthToken))
+        if not headerAuthToken or not checkAuthToken(headerAuthToken):
+            print 'return denyAccess()'
+            return denyAccess()
+        print 'return f()'
+        return f(*args, **kwargs)
+        print decorated
+    return decorated
 
-    #db = DB()
-    #if db.exists() != True :
-    #db.createTables()
+def generateAuthToken(self, credentials, expiration = tokenExpiration):
+    s = Serializer(app.config['SECRET_KEY'], expires_in = expiration)
+    print { 'username': credentials['username'] }
+    return s.dumps({ 'username': credentials['username'] })
 
-    message = "Hello Web!"
+def checkAuthToken(authToken):
+    s = Serializer(app.config['SECRET_KEY'])
+    try:
+        data = s.loads(authToken)
+    except SignatureExpired:
+        return False # valid token, but expired
+    except BadSignature:
+        return False # invalid token
+    return True
 
-    inputDefault = '{"type":"config","valveStates":[0,0,0,0,0,0,0,0]}'
+def denyAccess():
+    return json.dumps({ 'success': 'false', 'message': 'Authentication failed.' })
 
+@app.route("/action/login", methods=['GET', 'POST'])
+def actionLogin():
     if request.method == 'POST':
-        jsonValveConfigs = request.form['valve']
-        inputDefault = jsonValveConfigs
-        valveConfigs = json.loads(jsonValveConfigs)
-        if valveConfigs['type'] == 'config':
-            valveStates = valveConfigs['valveStates']
-            binaryValue = 0
-            for i in range(0,8):
-                if valveStates[i] == 1:
-                    binaryValue = binaryValue | 2**i
-            valves = Shiftregister()
-            valves.outputBinary(binaryValue)
-        else:
-            message = "Type \"%s\" is not defined." % valveConfigs['type']
+        params = request.get_json();
+        requestUsername = params['username']
+        requestPassword = params['password']
 
-    templateData = {
-        'title': 'Skrubba',
-        'message': message,
-        'config': inputDefault
-    }
-    return render_template('main.html', **templateData)
+        systemCredentials = {}
+        db = DB()
+        for line in db.loadSystemSettings():
+            if line['setting_name'] == 'username':
+                systemCredentials['username'] = line['setting_value']
+            if line['setting_name'] == 'password':
+                systemCredentials['password'] = line['setting_value']
+
+        if len(systemCredentials) == 2 and requestUsername == systemCredentials['username'] and requestPassword == systemCredentials['password']:
+            print 'Login successful'
+            token = generateAuthToken(request, systemCredentials, 600)
+            response = json.dumps({ 'success': 'true', 'token': token })
+        else:
+            print 'Login failed'
+            response = json.dumps({ 'success': 'false', 'message': 'Invalid login.' })
+    return response
+
+def checkLocalAccess():
+    requestIp = request.remote_addr
+    print 'checking request origin: %s' % requestIp
+    allowed = (requestIp == '127.0.0.1')
+    print 'allowed: %i' % allowed
+    return allowed
+
+########################################################################################################################
+# Flask CRUD routes
+########################################################################################################################
 
 @app.route("/data/plant.json", methods=['GET', 'POST'])
+@requires_auth
 def plant():
-
     db = DB()
-
     action = request.args.get('action')
 
     if action == 'read':
         valveConfigs = db.loadValveConfigs()
         print 'READ VALVE CONFIG:'
         print valveConfigs
-        #if(valveConfigs):
         response = json.dumps({ 'plant': valveConfigs })
-        #else:
-        #    plants.append({'valve': 1, 'name': 'Glückskastanie (Pachira aquatica)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'daily', 'measures':[40,30,20,60,20,50,10], 'isActive': 1 })
-        #    plants.append({'valve': 2, 'name': 'Elefantenfuß (Beaucarnea recurvata)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures':[40,30,30,40,40,30,40], 'isActive': 1})
-        #    plants.append({'valve': 3, 'name': 'Wolfsmilch (Euphorbia trigona)', 'onTime': '18:30', 'onDuration': 15, 'intervalType': 'weekly', 'measures': [40,30,40,60,40,50,50], 'isActive': 0 })
-        #    response = json.dumps({'plant':[plants[0],plants[1],plants[2]]})
-        #    response = json.dumps({'plant':[]})
 
     elif action == 'create':
         jsonValveConfigs = request.form['plant']
         valveConfig = json.loads(jsonValveConfigs)
-
         # check if valves can be added (system_settings.valve_amount)
         maxValves = db.getMaxValveCountSetting()
         actualValves = db.getValveCount()
@@ -184,6 +223,7 @@ def plant():
     return response
 
 @app.route("/data/log.json", methods=['GET', 'POST'])
+@requires_auth
 def log():
     db = DB()
     action = request.args.get('action')
@@ -194,19 +234,8 @@ def log():
         response = json.dumps({ 'log': logs })
     return response
 
-@app.route("/action/manualwatering", methods=['GET', 'POST'])
-def actionManualwatering():
-    if request.method == 'POST':
-        params = request.get_json();
-        valveNo = params['valve']
-        duration = params['duration']
-        valves = Shiftregister()
-        valves.outputBinary(valveNo)
-        print "opened valve %i" % valveNo
-    response = json.dumps({ 'success': 'true' })
-    return response
-
 @app.route("/data/setting.json", methods=['GET', 'POST'])
+@requires_auth
 def setting():
     db = DB()
     action = request.args.get('action')
@@ -251,43 +280,63 @@ def setting():
                 if value == '-DELETE-':
                     db.deleteSystemSetting(key)
             response = json.dumps({ 'success': 'true' })
-
     return response
 
-@app.route("/action/login", methods=['GET', 'POST'])
-def actionLogin():
+########################################################################################################################
+# Flask action routes
+########################################################################################################################
+
+@app.route("/action/manualwatering", methods=['GET', 'POST'])
+@requires_auth
+def actionManualwatering():
     if request.method == 'POST':
         params = request.get_json();
-        requestUsername = params['username']
-        requestPassword = params['password']
-
-        systemCredentials = {}
-        db = DB()
-        for line in db.loadSystemSettings():
-            if line['setting_name'] == 'username':
-                systemCredentials['username'] = line['setting_value']
-            if line['setting_name'] == 'password':
-                systemCredentials['password'] = line['setting_value']
-
-        if len(systemCredentials) == 2 and requestUsername == systemCredentials['username'] and requestPassword == systemCredentials['password']:
-            print 'Login successful'
-            response = json.dumps({ 'success': 'true' })
-        else:
-            print 'Login failed'
-            response = json.dumps({ 'success': 'false', 'message': 'Invalid login.' })
+        valveNo = params['valve']
+        duration = params['duration']
+        valves = Shiftregister()
+        valves.outputBinary(valveNo)
+        print "opened valve %i" % valveNo
+    response = json.dumps({ 'success': 'true' })
     return response
 
-def checkLocalAccess():
-    print 'checking access:'
-    requestIp = request.remote_addr
-    allowed = (requestIp == '127.0.0.1')
-    print requestIp
-    print allowed
-    return allowed
 
-def postServerOffRequest():
-    response = app.test_client().post('/serveroff')
+@app.route('/action/serveroff', methods=['POST'])
+@requires_auth
+def serveroff():
+    print 'SERVER SHUTTING DOWN'
+    if checkLocalAccess() == True:
+        #unloadScheduler()
+        unloadFlask()
+        response = json.dumps({ 'success': 'true' })
+    else:
+        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
     return response
+
+@app.route('/action/reboot', methods=['POST'])
+@requires_auth
+def reboot():
+    if checkLocalAccess() == True:
+        #unloadScheduler()
+        unloadFlask()
+        os.system("reboot")
+    else:
+        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
+    return
+
+@app.route('/action/shutdown', methods=['POST'])
+@requires_auth
+def shutdown():
+    if checkLocalAccess() == True:
+        #unloadScheduler()
+        unloadFlask()
+        os.system("poweroff")
+    else:
+        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
+    return
+
+########################################################################################################################
+# Unloading
+########################################################################################################################
 
 def unloadScheduler():
     print 'Shutting down scheduler...'
@@ -302,43 +351,17 @@ def unloadFlask():
     func()
     return
 
-@app.route('/action/serveroff', methods=['POST'])
-def serveroff():
-    print 'SERVER SHUTTING DOWN'
-    if checkLocalAccess() == True:
-        #unloadScheduler()
-        unloadFlask()
-        response = json.dumps({ 'success': 'true' })
-    else:
-        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
-    return response
+'''def postServerOffRequest():
+    response = app.test_client().post('/serveroff')
+    return response'''
 
-@app.route('/action/reboot', methods=['POST'])
-def reboot():
-    if checkLocalAccess() == True:
-        #unloadScheduler()
-        unloadFlask()
-        os.system("reboot")
-    else:
-        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
-    return
+########################################################################################################################
+# Flask main
+########################################################################################################################
 
-@app.route('/action/shutdown', methods=['POST'])
-def shutdown():
-    if checkLocalAccess() == True:
-        #unloadScheduler()
-        unloadFlask()
-        os.system("poweroff")
-    else:
-        response = json.dumps({ 'success': 'false', 'message': 'access denied' })
-    return
-
-# because there is no 64 bit version of pygame and the display is installed
-# on the raspberry pi, not on the development system, omit the import
-import struct
-cpuArchitecture = struct.calcsize('P') * 8
-if cpuArchitecture < 64:
-    from display import Display
+@app.route("/", methods=['GET', 'POST'])
+def index():
+    return render_template('index.html')
 
 if __name__ == "__main__":
     if (not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'):
