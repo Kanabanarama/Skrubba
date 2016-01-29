@@ -107,14 +107,26 @@ def addTftJob():
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        headerAuthToken = request.headers.get('authentication')
-        print 'authToken: %s / Token validation result: %i' % (headerAuthToken, checkAuthToken(headerAuthToken))
-        if not headerAuthToken or not checkAuthToken(headerAuthToken):
-            print 'return denyAccess()'
-            return denyAccessToken()
-        print 'return f()'
-        return f(*args, **kwargs)
+        if not isLoginRequired():
+            return f(*args, **kwargs)
+        else:
+            headerAuthToken = request.headers.get('authentication')
+            print 'authToken: %s / Token validation result: %i' % (headerAuthToken, checkAuthToken(headerAuthToken))
+            if not headerAuthToken or not checkAuthToken(headerAuthToken):
+                print 'return denyAccess()'
+                return denyAccessToken()
+            print 'return f()'
+            return f(*args, **kwargs)
     return decorated
+
+def isLoginRequired():
+    db = DB()
+    loginRequired = False
+    for line in db.loadSystemSettings():
+        if line['setting_name'] == 'username':
+            loginRequired = True
+            break
+    return loginRequired
 
 def generateAuthToken(self, credentials, expiration = tokenExpiration):
     s = Serializer(app.config['SECRET_KEY'], expires_in = expiration)
