@@ -384,8 +384,8 @@ from flask import send_from_directory
 # Serve favicon from static folder
 @app.route('/favicon.ico')
 def favicon():
-    faviconPath = os.path.join(app.root_path, 'static'), 'gfx/favicon.ico'
-    return send_from_directory(faviconPath, mimetype='image/vnd.microsoft.icon')
+    faviconPath = os.path.join(app.root_path, 'static')
+    return send_from_directory(faviconPath, 'gfx/favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 # Serve index page
 @app.route("/", methods=['GET', 'POST'])
@@ -408,4 +408,6 @@ if __name__ == "__main__":
             tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
             addTftJob()
     isRunningOnPi = os.uname()[4][:3] == 'arm'
+    #('Linux', 'raspberrypi', '3.18.11+', '#781 PREEMPT Tue Apr 21 18:02:18 BST 2015', 'armv6l')
+    #('Linux', 'Minzplattenspieler', '3.13.0-24-generic', '#47-Ubuntu SMP Fri May 2 23:30:00 UTC 2014', 'x86_64')
     app.run(host = '0.0.0.0', port = 80 if isRunningOnPi else 2525, debug = DEBUG)
