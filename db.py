@@ -75,10 +75,10 @@ class DB(object):
         return valveCount
 
     def getMaxValveCountSetting(self):
-        sql = 'SELECT IFNULL(setting_value, 99) FROM system_settings WHERE setting_name = "valve_amount";'
+        sql = 'SELECT setting_value FROM system_settings WHERE setting_name = "valve_amount";'
         self._cursor.execute(sql)
         result = self._cursor.fetchone()
-        valveMaxCount = int(result[0])
+        valveMaxCount = int(result[0]) if result else 8
         print 'getMaxValveCountSetting: %i' % valveMaxCount
         return valveMaxCount
 
