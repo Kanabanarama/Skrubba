@@ -379,6 +379,15 @@ if DEBUG:
 
     app.wsgi_app = SharedDataMiddleware(app.wsgi_app, { '/': os.path.join(os.path.dirname(__file__), 'templates') })
 
+from flask import send_from_directory
+
+# Serve favicon from static folder
+@app.route('/favicon.ico')
+def favicon():
+    faviconPath = os.path.join(app.root_path, 'static'), 'gfx/favicon.ico'
+    return send_from_directory(faviconPath, mimetype='image/vnd.microsoft.icon')
+
+# Serve index page
 @app.route("/", methods=['GET', 'POST'])
 def index():
     return render_template('index.html')
