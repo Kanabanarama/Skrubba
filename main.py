@@ -13,8 +13,8 @@ from db import DB
 
 # because there is no 64 bit version of pygame and the display is installed
 # on the raspberry pi, not on the development system, omit the import
-cpuArchitecture = struct.calcsize('P') * 8
-if cpuArchitecture < 64:
+RUNNINGONPI = os.uname()[4][:3] == 'arm'
+if RUNNINGONPI:
     from display import Display
 
 app = Flask(__name__, template_folder = 'templates')
@@ -90,6 +90,14 @@ def restartJobManager():
 
     print 'JOBS:'
     print scheduler.get_jobs()
+
+    if RUNNINGONPI:
+        while time.time() - displayTime < 5:
+            time.sleep(1)
+        tft.clear()
+        tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
+        addTftJob()
+
     return
 
 def addTftJob():
@@ -406,20 +414,13 @@ def index():
 
 if __name__ == "__main__":
     if (not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'):
-        if cpuArchitecture < 64:
+        if RUNNINGONPI:
             tft = Display()
             tft.displayImage('static/gfx/lcd-skrubba-color.png', (67, 10), True)
             displayTime = time.time()
         if scheduler.running == False:
             startScheduler()
             restartJobManager()
-        if cpuArchitecture < 64:
-            while time.time() - displayTime < 5:
-                time.sleep(1)
-            tft.clear()
-            tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
-            addTftJob()
-    isRunningOnPi = os.uname()[4][:3] == 'arm'
     #('Linux', 'raspberrypi', '3.18.11+', '#781 PREEMPT Tue Apr 21 18:02:18 BST 2015', 'armv6l')
     #('Linux', 'Minzplattenspieler', '3.13.0-24-generic', '#47-Ubuntu SMP Fri May 2 23:30:00 UTC 2014', 'x86_64')
-    app.run(host = '0.0.0.0', port = 80 if isRunningOnPi else 2525, debug = DEBUG)
+    app.run(host = '0.0.0.0', port = 80 if RUNNINGONPI else 2525, debug = DEBUG)
