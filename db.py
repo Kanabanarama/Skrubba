@@ -123,8 +123,8 @@ class DB(object):
 
     def addLogLine(self, data, logDate):
         print 'ADDING LOG LINE:'
-        print valveInfo
-        print onDate
+        print data
+        print logDate
         sql = 'INSERT INTO valve_logs(valve_config_id, valve, on_time, on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), (?), (?));'
         success = self._cursor.execute(sql, (data['id'], data['valve'], data['on_time'], data['on_duration'], data['interval_type'], logDate))
         self._connection.commit()
