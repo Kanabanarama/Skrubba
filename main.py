@@ -407,4 +407,5 @@ if __name__ == "__main__":
             tft.clear()
             tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
             addTftJob()
-    app.run(host = '0.0.0.0', port = 2525, debug = DEBUG)
+    isRunningOnPi = os.uname()[4][:3] == 'arm'
+    app.run(host = '0.0.0.0', port = 80 if isRunningOnPi else 2525, debug = DEBUG)
