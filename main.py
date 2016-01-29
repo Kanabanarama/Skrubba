@@ -418,6 +418,9 @@ if __name__ == "__main__":
             tft = Display()
             tft.displayImage('static/gfx/lcd-skrubba-color.png', (67, 10), True)
             displayTime = time.time()
+            # All valves off
+            shiftreg = Shiftregister()
+            shiftreg.reset()
         if scheduler.running == False:
             startScheduler()
             restartJobManager()
