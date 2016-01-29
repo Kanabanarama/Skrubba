@@ -252,7 +252,7 @@ def log():
     return response
 
 @app.route("/data/setting.json", methods=['GET', 'POST'])
-@requires_auth
+#@requires_auth
 @localhost_only
 def setting():
     db = DB()
@@ -372,6 +372,12 @@ def unloadFlask():
 ########################################################################################################################
 # Flask main
 ########################################################################################################################
+
+# Serve all static files from within template folder
+if DEBUG:
+    from werkzeug import SharedDataMiddleware
+
+    app.wsgi_app = SharedDataMiddleware(app.wsgi_app, { '/': os.path.join(os.path.dirname(__file__), 'templates') })
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
