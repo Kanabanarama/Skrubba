@@ -34,21 +34,23 @@ DEBUG = True
 
 def valveJob(setting): #(valve, onDuration)
     print 'OPENING VALVE'
-    durationLeft = int(setting['on_duration'])
+    durationLeft = int(setting['on_duration']) + 2
     #binaryValveList = map(int, list(format(setting['valve'], '08b')))
     #print binaryValveList
     relay = Relay()
     relay.on()
+    time.sleep(1)
     shiftreg = Shiftregister()
     #shiftreg.outputList(binaryValveList)
     shiftreg.outputDecimal(setting['valve'])
-    while durationLeft > 0:
+    while durationLeft > 2:
         time.sleep(1)
         durationLeft -= 1
         print 'TIME LEFT: %i' % durationLeft
     print 'CLOSING VALVE'
-    shiftreg.reset()
     relay.off()
+    time.sleep(1)
+    shiftreg.reset()
     db = DB()
     db.addLogLine(setting, datetime.now())
     return
