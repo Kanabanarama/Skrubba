@@ -9,6 +9,7 @@ from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer, BadSign
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 from shiftregister import Shiftregister
+from relay import Relay
 from db import DB
 
 # because there is no 64 bit version of pygame and the display is installed
@@ -36,6 +37,8 @@ def valveJob(setting): #(valve, onDuration)
     durationLeft = int(setting['on_duration'])
     #binaryValveList = map(int, list(format(setting['valve'], '08b')))
     #print binaryValveList
+    relay = Relay()
+    relay.on()
     shiftreg = Shiftregister()
     #shiftreg.outputList(binaryValveList)
     shiftreg.outputDecimal(setting['valve'])
@@ -45,6 +48,7 @@ def valveJob(setting): #(valve, onDuration)
         print 'TIME LEFT: %i' % durationLeft
     print 'CLOSING VALVE'
     shiftreg.reset()
+    relay.off()
     db = DB()
     db.addLogLine(setting, datetime.now())
     return
