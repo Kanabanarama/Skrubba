@@ -8,6 +8,7 @@
 # IMPORTS
 
 import RPi.GPIO as GPIO
+#import FakeRPi as GPIO
 
 # CLASS
 
@@ -15,6 +16,7 @@ class Shiftregister(object):
     _CLOCK = 17
     _LATCH = 27
     _DATA = 22
+    _OE = 4 # GPIO4 is pulled low by default, so Output Enable will turn off all parallel outs until we set it LOW
 
     def __init__(self):
         GPIO.setwarnings(False)
@@ -23,6 +25,9 @@ class Shiftregister(object):
         GPIO.setup(self._CLOCK,GPIO.OUT)
         GPIO.setup(self._LATCH,GPIO.OUT)
         GPIO.output(self._LATCH, 0)
+        self.reset() # set all outputs to HIGH (->OFF for relays)
+        GPIO.setup(self._OE,GPIO.OUT)
+        GPIO.output(self._OE, 0) # enable output
         return
 
     def __del__(self):
