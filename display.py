@@ -72,11 +72,11 @@ class Display(object):
     def updateJobDisplay(self):
         for index, job in enumerate(self._jobDict):
             xPos = 4
-            yPos = 50 + index * 25
+            yPos = 48 + index * 24
             jobDescription = job['on_time'] + ' - ' + job['name']
             text = self._font.render(jobDescription, 1, (255, 255, 255))
             rect = text.get_rect()
-            pygame.draw.rect(self._screen, (74, 74, 74), [xPos, yPos, 312, rect.height]) #(48, 48, 48)
+            pygame.draw.rect(self._screen, (74, 74, 74), [xPos, yPos, 312, rect.height-2]) #(48, 48, 48)
             self._screen.blit(text, (xPos, yPos))
             pygame.display.flip()
         return
