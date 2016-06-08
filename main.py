@@ -12,6 +12,12 @@ from shiftregister import Shiftregister
 from relay import Relay
 from db import DB
 
+# change working directory to directory of this script so that images
+# relative paths can be found
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
+
 # because there is no 64 bit version of pygame and the display is installed
 # on the raspberry pi, not on the development system, omit the import
 RUNNINGONPI = os.uname()[4][:3] == 'arm'
