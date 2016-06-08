@@ -134,7 +134,7 @@ class DB(object):
 
     def loadLogs(self):
         rows = []
-        self._cursor.execute('SELECT * FROM valve_logs LEFT JOIN valve_configs ON (valve_logs.valve_config_id = valve_configs.id);')
+        self._cursor.execute('SELECT valve_logs.* FROM valve_logs LEFT JOIN valve_configs ON (valve_logs.valve_config_id = valve_configs.id);')
         for row in self._cursor:
             print row
             rowDict = dict(itertools.izip(row.keys(), row))
