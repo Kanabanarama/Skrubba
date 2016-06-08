@@ -25,6 +25,7 @@ class Display(object):
         pygame.init()
         pygame.mouse.set_visible(0)
         self._font = pygame.font.Font(None, 30)
+        self._minifont = pygame.font.Font(None, 15)
         self._screen = pygame.display.set_mode((self._WIDTH, self._HEIGHT))
         return
 
@@ -75,14 +76,21 @@ class Display(object):
             xPos = 4
             yPos = 48 + index * 24
             jobDescription = job['on_time'] + ' - ' + job['name']
-            text = self._font.render(jobDescription, 1, (255, 255, 255))
-            rect = text.get_rect()
+            infoText = self._font.render(jobDescription, 1, (255, 255, 255))
+            infoRect = infoText.get_rect()
+            jobDuration = '(' + str(job['on_duration']) + 's)'
+            durationText = self._minifont.render(jobDuration, 1, (0, 0, 0))
+            durationRect = durationText.get_rect()
             if(job['id'] in self._activeJobs):
                 color = (22, 22, 205)
             else:
                 color = (74, 74, 74)
-            pygame.draw.rect(self._screen, color, [xPos, yPos, 312, rect.height-2]) #(48, 48, 48)
-            self._screen.blit(text, (xPos, yPos))
+            pygame.draw.rect(self._screen, color, [xPos, yPos, 312, infoRect.height-2]) #(48, 48, 48)
+
+            pygame.draw.rect(self._screen, (255, 0, 0), [312 - durationRect.width + 2, yPos + 4, durationRect.width+2, durationRect.height+2])
+
+            self._screen.blit(infoText, (xPos, yPos))
+            self._screen.blit(durationText, (312 - durationRect.width + 4, yPos+6))
             pygame.display.flip()
         return
 
