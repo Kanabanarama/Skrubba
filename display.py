@@ -19,6 +19,10 @@ class Display(object):
     _HEIGHT = 240
     _BGCOLOR = (255, 255, 255)
 
+    _CDRED = (249, 116, 75)
+    _CDGREEN = (0, 110, 46)
+    _CDBLUE = (79, 145, 196)
+
     def __init__(self):
         os.environ['SDL_FBDEV'] = '/dev/fb1'
         os.environ['SDL_VIDEODRIVER'] = 'fbcon'
@@ -82,13 +86,11 @@ class Display(object):
             durationText = self._minifont.render(jobDuration, 1, (0, 0, 0))
             durationRect = durationText.get_rect()
             if(job['id'] in self._activeJobs):
-                color = (22, 22, 205)
+                color = self._CDBLUE
             else:
                 color = (74, 74, 74)
             pygame.draw.rect(self._screen, color, [xPos, yPos, 312, infoRect.height-2]) #(48, 48, 48)
-
-            pygame.draw.rect(self._screen, (255, 0, 0), [312 - durationRect.width + 2, yPos + 4, durationRect.width+2, durationRect.height+2])
-
+            pygame.draw.rect(self._screen, self._CDRED, [312 - durationRect.width + 2, yPos + 4, durationRect.width+2, durationRect.height+2])
             self._screen.blit(infoText, (xPos, yPos))
             self._screen.blit(durationText, (312 - durationRect.width + 4, yPos+6))
             pygame.display.flip()
