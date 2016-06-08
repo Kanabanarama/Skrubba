@@ -20,6 +20,7 @@ class Relay(object):
         GPIO.setmode(GPIO.BCM)
         self._DATA = pin
         GPIO.setup(self._DATA,GPIO.OUT)
+        self.off()
         return
 
     def __del__(self):
