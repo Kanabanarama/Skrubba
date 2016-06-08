@@ -58,6 +58,7 @@ class Display(object):
         return
 
     _jobDict = []
+    _activeJobs = []
 
     def clearJobDisplay(self):
         del self._jobDict[:]
@@ -76,7 +77,18 @@ class Display(object):
             jobDescription = job['on_time'] + ' - ' + job['name']
             text = self._font.render(jobDescription, 1, (255, 255, 255))
             rect = text.get_rect()
-            pygame.draw.rect(self._screen, (74, 74, 74), [xPos, yPos, 312, rect.height-2]) #(48, 48, 48)
+            if(job['id'] in self._activeJobs):
+                color = (22, 22, 205)
+            else:
+                color = (74, 74, 74)
+            pygame.draw.rect(self._screen, color, [xPos, yPos, 312, rect.height-2]) #(48, 48, 48)
             self._screen.blit(text, (xPos, yPos))
             pygame.display.flip()
+        return
+
+    def markActiveJob(self, jobId, state):
+        if(state == True):
+            self._activeJobs.append(jobId)
+        else:
+            self._activeJobs.remove(jobId)
         return

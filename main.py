@@ -34,6 +34,7 @@ DEBUG = True
 
 def valveJob(setting): #(valve, onDuration)
     print 'OPENING VALVE'
+    tft.markActiveJob(setting['id'], True);
     durationLeft = int(setting['on_duration']) + 2
     #binaryValveList = map(int, list(format(setting['valve'], '08b')))
     #print binaryValveList
@@ -46,9 +47,10 @@ def valveJob(setting): #(valve, onDuration)
     while durationLeft > 2:
         time.sleep(1)
         durationLeft -= 1
-        print 'TIME LEFT: %i' % durationLeft
+        print 'TIME LEFT: %i' % (durationLeft - 1)
     print 'CLOSING VALVE'
     relay.off()
+    tft.markActiveJob(setting['id'], False);
     time.sleep(1)
     shiftreg.reset()
     db = DB()
