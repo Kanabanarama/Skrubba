@@ -103,13 +103,15 @@ def restartJobManager():
         while time.time() - displayTime < 5:
             time.sleep(1)
         tft.clear()
-        tft.displayImage('static/gfx/lcd-ui-background.png', (0, 0), True)
+        tft.setBackgroundImage('static/gfx/lcd-ui-background.png', (0, 0))
         addTftJob()
 
     return
 
 def addTftJob():
     def tftJob():
+        #if(os.getenv('SSH_CLIENT')): // os.environ.get('SSH_CLIENT') // os.environ['SSH_CLIENT'] // nothing ?
+        #    tft.displayText(os.getenv('SSH_CLIENT'), 24, (205, 30), (249, 116, 75), (0, 110, 46))
         tft.displayText(time.strftime('%H:%M:%S'), 40, (205, 10), (255, 255, 255), (0, 110, 46))
         tft.updateJobDisplay()
         return
@@ -420,6 +422,25 @@ def favicon():
 def index():
     return render_template('index.html')
 
+def setupKeepaliveTracking():
+    def trackBackendUserActivity():
+        for ip, counter in keepaliveCounters.iteritems():
+            keepaliveCounters[ip] -= 10
+            if(keepaliveCounters[ip] > 0):
+                tft.displayMessage(ip, ip + ' is logged in.')
+            else:
+                tft.clearMessage(ip)
+    scheduler.add_job(trackBackendUserActivity, 'interval', seconds = 10)
+    return
+
+keepaliveCounters = {}
+
+#@app.before_request
+@app.route("/keepalive", methods=['GET'])
+def refreshKeepalive():
+    keepaliveCounters[request.remote_addr] = 11
+    return json.dumps({ 'success': 'true' })
+
 if __name__ == "__main__":
     if (not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'):
         if RUNNINGONPI:
@@ -431,6 +452,7 @@ if __name__ == "__main__":
         if scheduler.running == False:
             startScheduler()
             restartJobManager()
+            setupKeepaliveTracking()
     #('Linux', 'raspberrypi', '3.18.11+', '#781 PREEMPT Tue Apr 21 18:02:18 BST 2015', 'armv6l')
     #('Linux', 'Minzplattenspieler', '3.13.0-24-generic', '#47-Ubuntu SMP Fri May 2 23:30:00 UTC 2014', 'x86_64')
     app.run(host = '0.0.0.0', port = 80 if RUNNINGONPI else 2525, debug = DEBUG)
