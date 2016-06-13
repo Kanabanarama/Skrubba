@@ -78,8 +78,6 @@ class Display(object):
         return
 
     def displayJob(self, jobConfig):
-        print 'Added job for displaying:'
-        print jobConfig
         self._jobDict.append(jobConfig)
         return
 
@@ -93,7 +91,7 @@ class Display(object):
     def clearMessage(self, key):
         #if last message is removed, rerender backround
         if(len(self._messageDict) == 1):
-            self.clear()
+            print "removing last message and rerender background"
             self.displayImage(self._backgroundImage['url'], (self._backgroundImage['x'], self._backgroundImage['y']), True)
         self._messageDict.pop(key, None)
         return
@@ -108,14 +106,19 @@ class Display(object):
             jobDuration = '(' + str(job['on_duration']) + 's)'
             durationText = self._minifont.render(jobDuration, 1, (255, 255, 255))
             durationRect = durationText.get_rect()
+            jobValve = str(job['valve'])
+            valveText = self._midifont.render(jobValve, 1, (0, 0, 0))
+            valveRect = valveText.get_rect()
             if(job['id'] in self._activeJobs):
                 color = self._CDBLUE
             else:
                 color = (74, 74, 74)
             pygame.draw.rect(self._screen, color, [xPos, yPos, 312, infoRect.height-2]) #(48, 48, 48)
             pygame.draw.rect(self._screen, self._CDGREEN, [312 - durationRect.width + 2, yPos + 4, durationRect.width+2, durationRect.height+2])
-            self._screen.blit(infoText, (xPos, yPos))
+            pygame.draw.rect(self._screen, self._CDBLUE, [0, yPos, valveRect.width+4, valveRect.height+2])
+            self._screen.blit(infoText, (xPos+valveRect.width + 2, yPos))
             self._screen.blit(durationText, (312 - durationRect.width + 4, yPos+6))
+            self._screen.blit(valveText, (2, yPos+2))
             # after rendering last job, show any existing messages
         messageCount = len(self._messageDict)
         if(messageCount > 0):
