@@ -18,9 +18,7 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
-# because there is no 64 bit version of pygame and the display is installed
-# on the raspberry pi, not on the development system, omit the import
-RUNNINGONPI = os.uname()[4][:3] == 'arm'
+from environment import RUNNINGONPI
 if RUNNINGONPI:
     from display import Display
 
@@ -87,14 +85,16 @@ def restartJobManager():
     if len(scheduler.get_jobs()) > 0:
         for job in scheduler.get_jobs():
             scheduler.remove_job(job.id)
-        tft.clearJobDisplay()
+        if RUNNINGONPI:
+          tft.clearJobDisplay()
 
     # Add all jobs that are stored in database
     db = DB()
     valveConfigs = db.loadValveConfigs()
     for config in valveConfigs:
         if config['on_time'] and config['on_duration'] and config['is_active']:
-            tft.displayJob(config)
+            if RUNNINGONPI:
+              tft.displayJob(config)
             timeComponents = map(int, config['on_time'].split(':'))
             timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
             if(config['interval_type'] == 'daily'):
@@ -441,10 +441,11 @@ def setupKeepaliveTracking():
     def trackBackendUserActivity():
         for ip, counter in keepaliveCounters.iteritems():
             keepaliveCounters[ip] -= 10
-            if(keepaliveCounters[ip] > 0):
-                tft.displayMessage(ip, ip + ' is logged in.')
-            else:
-                tft.clearMessage(ip)
+            if(RUNNINGONPI):
+              if(keepaliveCounters[ip] > 0) :
+                  tft.displayMessage(ip, ip + ' is logged in.')
+              else:
+                  tft.clearMessage(ip)
     scheduler.add_job(trackBackendUserActivity, 'interval', seconds = 10)
     return
 
@@ -456,7 +457,14 @@ def refreshKeepalive():
     keepaliveCounters[request.remote_addr] = 11
     return json.dumps({ 'success': 'true' })
 
+#import argparse
+
 if __name__ == "__main__":
+    #parser = argparse.ArgumentParser(description = 'Let program simulate on local machine.')
+    #parser.add_argument('local')
+    #args = parser.parse_args()
+    #print(args.accumulate(args.local))
+    #exit;
     if (not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'):
         if RUNNINGONPI:
             tft = Display()

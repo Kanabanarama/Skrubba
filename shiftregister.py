@@ -6,9 +6,12 @@
 # by Kana kanabanarama@googlemail.com
 
 # IMPORTS
+from environment import RUNNINGONPI
 
-import RPi.GPIO as GPIO
-#import FakeRPi as GPIO
+if RUNNINGONPI:
+  import RPi.GPIO as GPIO
+else:
+  import FakeRPi as GPIO
 
 # CLASS
 
