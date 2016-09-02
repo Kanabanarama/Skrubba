@@ -21,7 +21,7 @@ class DB(object):
         return
 
     def __del__(self):
-        print "Closing db connection."
+        # print "Closing db connection."
         self._connection.close()
         return
 
@@ -31,7 +31,7 @@ class DB(object):
         return False
 
     def __createTables(self):
-        print "Creating table..."
+        # print "Creating table..."
         createdTables = 0
         self._cursor.execute('CREATE TABLE system_settings(setting_name TEXT UNIQUE, setting_value TEXT);')
         createdTables += self._cursor.rowcount
@@ -44,14 +44,14 @@ class DB(object):
         return success
 
     def updateSystemSettings(self, settingName, settingValue):
-        print 'UPDATE SYSTEM SETTINGS: %s = %s' % (settingName, settingValue)
+        # print 'UPDATE SYSTEM SETTINGS: %s = %s' % (settingName, settingValue)
         sql = 'INSERT OR REPLACE INTO system_settings (setting_name, setting_value) VALUES ((?), (?));'
         success = self._cursor.execute(sql, (settingName, settingValue))
         self._connection.commit()
         return success
 
     def deleteSystemSetting(self, settingName):
-        print 'DELETE SYSTEM SETTING: %s' % settingName
+        # print 'DELETE SYSTEM SETTING: %s' % settingName
         sql = 'DELETE FROM system_settings WHERE setting_name = (?);'
         success = self._cursor.execute(sql, (settingName,))
         self._connection.commit()
@@ -61,7 +61,7 @@ class DB(object):
         rows = []
         self._cursor.execute('SELECT * FROM system_settings;')
         for row in self._cursor:
-            print row
+            # print row
             rowDict = dict(itertools.izip(row.keys(), row))
             rows.append(rowDict)
         return rows
@@ -71,7 +71,7 @@ class DB(object):
         self._cursor.execute(sql)
         result = self._cursor.fetchone()
         valveCount = int(result[0])
-        print 'getValveCount: %i' % valveCount
+        # print 'getValveCount: %i' % valveCount
         return valveCount
 
     def getMaxValveCountSetting(self):
@@ -79,7 +79,7 @@ class DB(object):
         self._cursor.execute(sql)
         result = self._cursor.fetchone()
         valveMaxCount = int(result[0]) if result else 8
-        print 'getMaxValveCountSetting: %i' % valveMaxCount
+        # print 'getMaxValveCountSetting: %i' % valveMaxCount
         return valveMaxCount
 
     def addValveConfig(self, config):
@@ -87,7 +87,7 @@ class DB(object):
         self._cursor.execute(sql)
         nextUnusedValve = self._cursor.fetchone()
         if nextUnusedValve is not None:
-            #print int(re.search(r'\d+', nextUnusedValve).group())
+            # print 'Next unused valve: ' + str(int(re.search(r'\d+', nextUnusedValve).group()))
             nextUnusedValve = nextUnusedValve[0]
         else:
             nextUnusedValve = 1
@@ -115,20 +115,20 @@ class DB(object):
 
     def loadValveConfigs(self):
         rows = []
-        self._cursor.execute('SELECT * FROM valve_configs')
+        self._cursor.execute('SELECT * FROM valve_configs ORDER BY valve')
         for row in self._cursor:
             rowDict = dict(itertools.izip(row.keys(), row))
             rows.append(rowDict)
         return rows
 
     def addLogLine(self, data, logDate):
-        print 'ADDING LOG LINE:'
-        print data
-        print logDate
+        # print 'ADDING LOG LINE:'
+        # print data
+        # print logDate
         sql = 'INSERT INTO valve_logs(valve_config_id, valve, on_time, on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), (?), (?));'
         success = self._cursor.execute(sql, (data['id'], data['valve'], data['on_time'], data['on_duration'], data['interval_type'], logDate))
         self._connection.commit()
-        print 'LINES ADDED: %i' % self._cursor.rowcount
+        # print 'LINES ADDED: %i' % self._cursor.rowcount
         row = [{ 'id': self._cursor.lastrowid }]
         return row
 
@@ -136,7 +136,7 @@ class DB(object):
         rows = []
         self._cursor.execute('SELECT valve_logs.* FROM valve_logs LEFT JOIN valve_configs ON (valve_logs.valve_config_id = valve_configs.id);')
         for row in self._cursor:
-            print row
+            # print row
             rowDict = dict(itertools.izip(row.keys(), row))
             rows.append(rowDict)
         return rows

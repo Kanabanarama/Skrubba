@@ -44,28 +44,33 @@ def valveJob(setting): #(valve, onDuration)
     durationLeft = int(setting['on_duration']) + 2
     #binaryValveList = map(int, list(format(setting['valve'], '08b')))
     #print binaryValveList
-    relay = Relay()
-    relay.on()
+    pump = Relay()
+    pump.on()
     time.sleep(1)
-    shiftreg = Shiftregister()
+    #valves = Shiftregister()
     #shiftreg.outputList(binaryValveList)
-    shiftreg.outputDecimal(setting['valve'])
+    valves.outputDecimal(setting['valve'])
+    #valves.enable()
     while durationLeft > 2:
         time.sleep(1)
         durationLeft -= 1
         print 'TIME LEFT: %i' % (durationLeft - 1)
     print 'CLOSING VALVE'
-    relay.off()
-    tft.markActiveJob(setting['id'], False);
+    pump.off()
+    print 'reset shift register 1'
+    #valves.disable()
+    valves.reset()
     time.sleep(1)
-    shiftreg.reset()
+
+    #valves.reset()
+    tft.markActiveJob(setting['id'], False);
     db = DB()
     db.addLogLine(setting, datetime.now())
     return
 
 def startScheduler():
     # start scheduler if not already running (debug mode has 2 threads, so we have to make sure it only starts once)
-    print 'Starting scheduler...'
+    # print 'Starting scheduler...'
     scheduler.start()
     scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
     atexit.register(unloadScheduler)
@@ -94,16 +99,16 @@ def restartJobManager():
             timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
             if(config['interval_type'] == 'daily'):
                 scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [config])
-                print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
+                # print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
             if(config['interval_type'] == 'weekly'):
                 scheduler.add_job(valveJob, 'cron', day_of_week = 'sun', hour = timeComponents[0], minute = timeComponents[1], args = [config])
-                print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
+                # print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
             if(config['interval_type'] == 'monthly'):
                 scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [config])
-                print 'Scheduled monthly job [1st of the month %i:%i]' % (timeComponents[0], timeComponents[1])
+                # print 'Scheduled monthly job [1st of the month %i:%i]' % (timeComponents[0], timeComponents[1])
 
-    print 'JOBS:'
-    print scheduler.get_jobs()
+    # print 'JOBS:'
+    # print scheduler.get_jobs()
 
     if RUNNINGONPI:
         while time.time() - displayTime < 5:
@@ -205,9 +210,9 @@ def localhost_only(f):
             allowed = (requestIp == '127.0.0.1')
         print 'allowed: %i' % allowed
         if not allowed:
-            print 'return denyIp()'
+            print 'return denyIp()' + requestIp
             return denyRequestIp()
-        print 'return f()'
+        #print 'return f()'
         return f(*args, **kwargs)
     return decorated
 
@@ -227,8 +232,8 @@ def plant():
 
     if action == 'read':
         valveConfigs = db.loadValveConfigs()
-        print 'READ VALVE CONFIG:'
-        print valveConfigs
+        # print 'READ VALVE CONFIG:'
+        # print valveConfigs
         response = json.dumps({ 'plant': valveConfigs })
 
     elif action == 'create':
@@ -238,8 +243,8 @@ def plant():
         maxValves = db.getMaxValveCountSetting()
         actualValves = db.getValveCount()
         if not maxValves or actualValves < maxValves:
-            print 'CREATED VALVE CONFIG:'
-            print valveConfig
+            # print 'CREATED VALVE CONFIG:'
+            # print valveConfig
             newRow = db.addValveConfig(valveConfig)
             if len(newRow):
                 restartJobManager()
@@ -253,8 +258,8 @@ def plant():
     elif action == 'update':
         jsonValveConfigs = request.form['plant']
         valveConfig = json.loads(jsonValveConfigs)
-        print 'UPDATED VALVE CONFIG:'
-        print valveConfig
+        # print 'UPDATED VALVE CONFIG:'
+        # print valveConfig
         success = db.saveValveConfig(valveConfig)
         if success == True:
             restartJobManager()
@@ -266,8 +271,8 @@ def plant():
     elif action == 'destroy':
         jsonValveConfigs = request.form['plant']
         valveConfig = json.loads(jsonValveConfigs)
-        print 'DELETED VALVE CONFIG:'
-        print valveConfig
+        # print 'DELETED VALVE CONFIG:'
+        # print valveConfig
         success = db.deleteValveConfig(valveConfig['id'])
         restartJobManager()
         response = json.dumps({ 'success': str(success).lower() })
@@ -282,8 +287,8 @@ def log():
     action = request.args.get('action')
     if action == 'read':
         logs = db.loadLogs()
-        print 'READ LOGS:'
-        print logs
+        # print 'READ LOGS:'
+        # print logs
         response = json.dumps({ 'log': logs })
     return response
 
@@ -295,13 +300,13 @@ def setting():
     action = request.args.get('action')
     if action == 'read':
         settings = {}
-        print 'READ SYSTEM CONF:'
+        # print 'READ SYSTEM CONF:'
         for line in db.loadSystemSettings():
             if line['setting_name'] == 'password':
                 continue
             settings.update({ line['setting_name']: line['setting_value'] })
         response = json.dumps({ 'setting': [settings] })
-        print response
+        # print response
     elif action == 'update':
         if request.method == 'POST':
             jsonCredentials = request.form['setting']
@@ -327,10 +332,10 @@ def setting():
         if request.method == 'POST':
             jsonCredentials = request.form['setting']
             params = json.loads(jsonCredentials)
-            print params
+            # print params
             #for setting in params:
             for key, value in params.items():
-                print 'checking: %s / %s' % (key, value)
+                # print 'checking: %s / %s' % (key, value)
                 if value == '-DELETE-':
                     db.deleteSystemSetting(key)
             response = json.dumps({ 'success': 'true' })
@@ -350,7 +355,7 @@ def actionManualwatering():
         duration = params['duration']
         valves = Shiftregister()
         valves.outputBinary(valveNo)
-        print "opened valve %i" % valveNo
+        print "OPENED VALVE %i" % valveNo
     response = json.dumps({ 'success': 'true' })
     return response
 
@@ -360,6 +365,7 @@ def actionManualwatering():
 @localhost_only
 def serveroff():
     print 'SERVER SHUTTING DOWN'
+    tft.displayMessage('SHUTDOWN SERVER')
     #unloadScheduler()
     unloadFlask()
     return json.dumps({ 'success': 'true' })
@@ -369,6 +375,7 @@ def serveroff():
 @localhost_only
 def reboot():
     print 'SYSTEM REBOOTING'
+    tft.displayMessage('REBOOTING')
     #unloadScheduler()
     unloadFlask()
     os.system("reboot")
@@ -379,6 +386,7 @@ def reboot():
 @localhost_only
 def shutdown():
     print 'SYSTEM SHUTDOWN'
+    tft.displayMessage('SHUTDOWN SYSTEM')
     #unloadScheduler()
     unloadFlask()
     os.system("poweroff")
@@ -426,6 +434,7 @@ def favicon():
 # Serve index page
 @app.route("/", methods=['GET', 'POST'])
 def index():
+    #print "user /"
     return render_template('index.html')
 
 def setupKeepaliveTracking():
@@ -454,7 +463,7 @@ if __name__ == "__main__":
             tft.displayImage('static/gfx/lcd-skrubba-color.png', (67, 10), True)
             displayTime = time.time()
             # All valves off
-            shiftreg = Shiftregister()
+            valves = Shiftregister()
         if scheduler.running == False:
             startScheduler()
             restartJobManager()

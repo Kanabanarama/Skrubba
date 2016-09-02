@@ -27,11 +27,22 @@ class Shiftregister(object):
         GPIO.output(self._LATCH, 0)
         self.reset() # set all outputs to HIGH (->OFF for relays)
         GPIO.setup(self._OE,GPIO.OUT)
-        GPIO.output(self._OE, 0) # enable output
+        #GPIO.output(self._OE, 0) # enable output
+        self.enable()
         return
 
     def __del__(self):
-        #GPIO.cleanup()
+        GPIO.cleanup()
+        return
+
+    def enable(self):
+        print "output enable"
+        GPIO.output(self._OE, 0)
+        return;
+
+    def disable(self):
+        print 'output disable'
+        GPIO.output(self._OE, 1)
         return
 
     def __pulseClock(self):
