@@ -96,15 +96,14 @@ def restartJobManager():
             if RUNNINGONPI:
               tft.displayJob(config)
             timeComponents = map(int, config['on_time'].split(':'))
-            timeNextRun = datetime.now().replace(hour = timeComponents[0], minute = timeComponents[1], second = 0, microsecond = 0)
             if(config['interval_type'] == 'daily'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], args = [config])
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], second = timeComponents[2], args = [config])
                 # print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
             if(config['interval_type'] == 'weekly'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'sun', hour = timeComponents[0], minute = timeComponents[1], args = [config])
+                scheduler.add_job(valveJob, 'cron', day_of_week = 'sun', hour = timeComponents[0], minute = timeComponents[1], second = timeComponents[2], args = [config])
                 # print 'Scheduled weekly job [sun %i:%i]' % (timeComponents[0], timeComponents[1])
             if(config['interval_type'] == 'monthly'):
-                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], args = [config])
+                scheduler.add_job(valveJob, 'cron', day = 1, hour = timeComponents[0], minute = timeComponents[1], second = timeComponents[2], args = [config])
                 # print 'Scheduled monthly job [1st of the month %i:%i]' % (timeComponents[0], timeComponents[1])
 
     # print 'JOBS:'
