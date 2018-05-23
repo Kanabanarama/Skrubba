@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+
+"""
+File environment.py
+Checks if program is running on a Rasbperry Pi
+by Kana kanabanarama@googlemail.com
+"""
+
 import os
 
 # because there is no 64 bit version of pygame and the display is installed

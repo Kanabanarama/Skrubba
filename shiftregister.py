@@ -1,36 +1,37 @@
 #!/usr/bin/env python
 
-# File shiftregister.py
-# Use shift register to control relays
-# 8 relay board connected to 74HC595
-# by Kana kanabanarama@googlemail.com
+"""
+File shiftregister.py
+8 relay board connected to 74HC595
+by Kana kanabanarama@googlemail.com
+"""
 
-# IMPORTS
-import os
 from environment import RUNNINGONPI
 
 if RUNNINGONPI:
-  import RPi.GPIO as GPIO
+    import RPi.GPIO as GPIO
 else:
-  import FakeRPi as GPIO
-
-# CLASS
+    import FakeRPi as GPIO
 
 class Shiftregister(object):
+    """
+    Use shift register to control relays
+    """
     _CLOCK = 17
     _LATCH = 27
     _DATA = 22
-    _OE = 4 # GPIO4 is pulled low by default, so Output Enable will turn off all parallel outs until we set it LOW
+    _OE = 4 # GPIO4 is pulled low by default, so Output Enable will turn off all
+            # parallel outs until we set it LOW
 
     def __init__(self):
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self._DATA,GPIO.OUT)
-        GPIO.setup(self._CLOCK,GPIO.OUT)
-        GPIO.setup(self._LATCH,GPIO.OUT)
+        GPIO.setup(self._DATA, GPIO.OUT)
+        GPIO.setup(self._CLOCK, GPIO.OUT)
+        GPIO.setup(self._LATCH, GPIO.OUT)
         GPIO.output(self._LATCH, 0)
         self.reset() # set all outputs to HIGH (->OFF for relays)
-        GPIO.setup(self._OE,GPIO.OUT)
+        GPIO.setup(self._OE, GPIO.OUT)
         #GPIO.output(self._OE, 0) # enable output
         self.enable()
         return
@@ -41,7 +42,7 @@ class Shiftregister(object):
 
     def enable(self):
         GPIO.output(self._OE, 0)
-        return;
+        return
 
     def disable(self):
         GPIO.output(self._OE, 1)
@@ -58,7 +59,7 @@ class Shiftregister(object):
         return
 
     def reset(self):
-        for x in range(0, 8):
+        for _ in range(0, 8):
             GPIO.output(self._DATA, 1)
             self.__pulseClock()
         self.__pulseLatch()
@@ -70,8 +71,8 @@ class Shiftregister(object):
         return
 
     def outputBinary(self, binaryValue):
-        bits = [True for i in range (8)]
-        for i in range (8):
+        bits = [True for i in range(8)]
+        for i in range(8):
             bits[7-i] = False if binaryValue & 1 else True
             GPIO.output(self._DATA, bits[7-i])
             self.__pulseClock()
@@ -81,16 +82,16 @@ class Shiftregister(object):
 
     def outputList(self, valueList):
         binaryValue = 0
-        for i in range(0,8):
+        for i in range(0, 8):
             if valueList[i] == 1:
                 valueList = binaryValue | 2**i
         self.outputBinary(binaryValue)
         return
 
-    def testLoop():
+    def testLoop(self):
         while 1:
             bitValue = 1
-            for i in range(0, 8):
+            for _ in range(0, 8):
                 outputBinary(bitValue)
                 bitValue = bitValue << 1
                 time.sleep(2)

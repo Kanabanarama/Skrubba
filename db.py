@@ -1,13 +1,18 @@
 #!/usr/bin/env python
 
-# File db.py
-# Class for saving and loading configuration
-# Database is sqlite3
-# by Kana kanabanarama@googlemail.com
+"""
+File db.py
+Database is sqlite3
+by Kana kanabanarama@googlemail.com
+"""
 
-import sqlite3, os
+import os
+import sqlite3
 
 class DB(object):
+    """
+    Class for saving and loading configuration
+    """
     _connection = None
     _cursor = None
     def __init__(self):
@@ -33,11 +38,17 @@ class DB(object):
     def __createTables(self):
         # print "Creating table..."
         createdTables = 0
-        self._cursor.execute('CREATE TABLE system_settings(setting_name TEXT UNIQUE, setting_value TEXT);')
+        self._cursor.execute('CREATE TABLE system_settings(setting_name TEXT'
+                             'UNIQUE, setting_value TEXT);')
         createdTables += self._cursor.rowcount
-        self._cursor.execute('CREATE TABLE valve_configs(id INTEGER PRIMARY KEY, valve INTEGER UNIQUE, name TEXT, on_time DATETIME, on_duration INTEGER, interval_type TEXT, is_active BOOLEAN);')
+        self._cursor.execute('CREATE TABLE valve_configs(id INTEGER PRIMARY KEY'
+                             ', valve INTEGER UNIQUE, name TEXT, on_time'
+                             'DATETIME, on_duration INTEGER, interval_type TEXT'
+                             ', is_active BOOLEAN);')
         createdTables += self._cursor.rowcount
-        self._cursor.execute('CREATE TABLE valve_logs(valve_config_id INTEGER, valve INTEGER, on_time DATETIME, on_duration INTEGER, interval_type TEXT, last_on_date TEXT);')
+        self._cursor.execute('CREATE TABLE valve_logs(valve_config_id INTEGER, '
+                             'valve INTEGER, on_time DATETIME, on_duration '
+                             'INTEGER, interval_type TEXT, last_on_date TEXT);')
         createdTables += self._cursor.rowcount
         #success = bool(self._cursor.rowcount)
         success = (createdTables == 3)
@@ -45,7 +56,8 @@ class DB(object):
 
     def updateSystemSettings(self, settingName, settingValue):
         # print 'UPDATE SYSTEM SETTINGS: %s = %s' % (settingName, settingValue)
-        sql = 'INSERT OR REPLACE INTO system_settings (setting_name, setting_value) VALUES ((?), (?));'
+        sql = ('INSERT OR REPLACE INTO system_settings (setting_name, '
+               'setting_value) VALUES ((?), (?));')
         success = self._cursor.execute(sql, (settingName, settingValue))
         self._connection.commit()
         return success
@@ -83,7 +95,8 @@ class DB(object):
         return valveMaxCount
 
     def addValveConfig(self, config):
-        sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL;'
+        sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN '
+        'valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL;'
         self._cursor.execute(sql)
         nextUnusedValve = self._cursor.fetchone()
         if nextUnusedValve is not None:
@@ -91,16 +104,31 @@ class DB(object):
             nextUnusedValve = nextUnusedValve[0]
         else:
             nextUnusedValve = 1
-        sql = 'INSERT INTO valve_configs(valve, name, on_time, on_duration, interval_type) VALUES((?), (?), (?), (?), (?));'
-        success = self._cursor.execute(sql, (nextUnusedValve, config['name'], config['on_time'], config['on_duration'], config['interval_type']))
+        sql = ('INSERT INTO valve_configs(valve, name, on_time, on_duration, '
+               'interval_type) VALUES((?), (?), (?), (?), (?));')
+        success = self._cursor.execute(sql, (
+            nextUnusedValve,
+            config['name'],
+            config['on_time'],
+            config['on_duration'],
+            config['interval_type']))
         self._connection.commit()
-        row = [{ 'id': self._cursor.lastrowid, 'valve': nextUnusedValve }]
+        row = [{'id': self._cursor.lastrowid, 'valve': nextUnusedValve}]
         return row
 
     def saveValveConfig(self, config): #id, valve, name, onTime, onDuration, intervalType, isActive
         try:
-            sql = 'UPDATE valve_configs set valve = (?), name = (?), on_time = (?), on_duration = (?), interval_type = (?), is_active = (?) WHERE id = (?);'
-            success = self._cursor.execute(sql, (config['valve'], config['name'], config['on_time'], config['on_duration'], config['interval_type'], config['is_active'], config['id']))
+            sql = ('UPDATE valve_configs set valve = (?), name = (?), on_time = '
+                   '(?), on_duration = (?), interval_type = (?), is_active = (?) '
+                   'WHERE id = (?);')
+            success = self._cursor.execute(sql, (
+                config['valve'],
+                config['name'],
+                config['on_time'],
+                config['on_duration'],
+                config['interval_type'],
+                config['is_active'],
+                config['id']))
             self._connection.commit()
             success = True
         except sqlite3.IntegrityError:
@@ -125,16 +153,26 @@ class DB(object):
         # print 'ADDING LOG LINE:'
         # print data
         # print logDate
-        sql = 'INSERT INTO valve_logs(valve_config_id, valve, on_time, on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), (?), (?));'
-        success = self._cursor.execute(sql, (data['id'], data['valve'], data['on_time'], data['on_duration'], data['interval_type'], logDate))
+        sql = ('INSERT INTO valve_logs(valve_config_id, valve, on_time, '
+               'on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), '
+               '(?), (?));')
+        success = self._cursor.execute(sql, (
+            data['id'],
+            data['valve'],
+            data['on_time'],
+            data['on_duration'],
+            data['interval_type'],
+            logDate))
         self._connection.commit()
         # print 'LINES ADDED: %i' % self._cursor.rowcount
-        row = [{ 'id': self._cursor.lastrowid }]
+        row = [{'id': self._cursor.lastrowid}]
         return row
 
     def loadLogs(self):
         rows = []
-        self._cursor.execute('SELECT valve_logs.* FROM valve_logs LEFT JOIN valve_configs ON (valve_logs.valve_config_id = valve_configs.id);')
+        self._cursor.execute('SELECT valve_logs.* FROM valve_logs LEFT JOIN '
+                             'valve_configs ON (valve_logs.valve_config_id = '
+                             'valve_configs.id);')
         for row in self._cursor:
             # print row
             rowDict = dict(zip(row.keys(), row))

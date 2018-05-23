@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 
-# File display.py
-# Control display to show status information
-# [display type] connected via SPI-Interface
-# by Kana kanabanarama@googlemail.com
-
-# IMPORTS
+"""
+File display.py
+Display must be connected via SPI-Interface
+by Kana kanabanarama@googlemail.com
+"""
 
 import os
-import sys
 import time
 import pygame
 
-# CLASS
-
 class Display(object):
+    """
+    Control display to show status information
+    """
     _WIDTH = 320
     _HEIGHT = 240
     _BGCOLOR = (255, 255, 255)
@@ -53,7 +52,7 @@ class Display(object):
         self.displayImage(url, x, y, True)
         return
 
-    def displayImage(self, url, x, y, clearScreen = True):
+    def displayImage(self, url, x, y, clearScreen=True):
         if clearScreen:
             self.clear()
         image = pygame.image.load(url)
@@ -61,7 +60,7 @@ class Display(object):
         pygame.display.flip()
         return
 
-    def displayText(self, text, size, x , y, color, bgcolor):
+    def displayText(self, text, size, x, y, color, bgcolor):
         font = pygame.font.Font(None, size)
         text = font.render(text, 1, color)
         rect = text.get_rect()
@@ -90,10 +89,13 @@ class Display(object):
 
     def clearMessage(self, key):
         #if last message is removed, rerender backround
-        if(len(self._messageDict) == 1):
+        if len(self._messageDict) == 1:
             print("Removing last message and rerender background")
             print(self._backgroundImage)
-            self.displayImage(self._backgroundImage['url'], self._backgroundImage['x'], self._backgroundImage['y'], True)
+            self.displayImage(self._backgroundImage['url'],
+                              self._backgroundImage['x'],
+                              self._backgroundImage['y'],
+                              True)
         self._messageDict.pop(key, None)
         return
 
@@ -110,27 +112,54 @@ class Display(object):
             jobValve = str(job['valve'])
             valveText = self._midifont.render(jobValve, 1, (0, 0, 0))
             valveRect = valveText.get_rect()
-            if(job['id'] in self._activeJobs):
+            if job['id'] in self._activeJobs:
                 color = self._CDBLUE
             else:
                 color = (74, 74, 74)
-            pygame.draw.rect(self._screen, color, [xPos, yPos, 312, infoRect.height-2]) #(48, 48, 48)
-            pygame.draw.rect(self._screen, self._CDGREEN, [312 - durationRect.width + 2, yPos + 4, durationRect.width+2, durationRect.height+2])
-            pygame.draw.rect(self._screen, self._CDBLUE, [0, yPos, valveRect.width+4, valveRect.height+2])
+            pygame.draw.rect(self._screen,
+                             color,
+                             [xPos,
+                              yPos,
+                              312,
+                              infoRect.height-2]) #(48, 48, 48)
+            pygame.draw.rect(self._screen,
+                             self._CDGREEN,
+                             [312 - durationRect.width + 2,
+                              yPos + 4,
+                              durationRect.width+2,
+                              durationRect.height+2])
+            pygame.draw.rect(self._screen,
+                             self._CDBLUE,
+                             [0,
+                              yPos,
+                              valveRect.width+4,
+                              valveRect.height+2])
             self._screen.blit(infoText, (xPos+valveRect.width + 2, yPos))
-            self._screen.blit(durationText, (312 - durationRect.width + 4, yPos+6))
+            self._screen.blit(durationText,
+                              (312 - durationRect.width + 4, yPos+6))
             self._screen.blit(valveText, (2, yPos+2))
             # after rendering last job, show any existing messages
         messageCount = len(self._messageDict)
-        if(messageCount > 0):
-            if(int(time.time()) % 2 == 0):
+        if messageCount > 0:
+            if int(time.time()) % 2 == 0:
                 messageBoxFillColor = self._CDRED
                 messageBoxBorderColor = self._CDBLUE
             else:
                 messageBoxFillColor = self._CDBLUE
                 messageBoxBorderColor = self._CDRED
-            pygame.draw.rect(self._screen, messageBoxBorderColor, [46, 0, 272, 42*messageCount+2], 2)
-            pygame.draw.rect(self._screen, messageBoxFillColor, [48, 2, 270, 42*messageCount])
+            pygame.draw.rect(self._screen,
+                             messageBoxBorderColor,
+                             [46,
+                              0,
+                              272,
+                              42*messageCount+2],
+                             2)
+            pygame.draw.rect(self._screen,
+                             messageBoxFillColor,
+                             [48,
+                              2,
+                              270,
+                              42*messageCount])
             for message in self._messageDict.values():
                 messageText = self._font.render(message, 1, (0, 0, 0))
                 self._screen.blit(messageText, (62, 42*messageCount-30))
@@ -138,7 +167,7 @@ class Display(object):
         return
 
     def markActiveJob(self, jobId, state):
-        if(state == True):
+        if state:
             self._activeJobs.append(jobId)
         else:
             self._activeJobs.remove(jobId)
