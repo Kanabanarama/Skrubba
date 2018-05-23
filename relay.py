@@ -6,6 +6,7 @@
 # by Kana kanabanarama@googlemail.com
 
 # IMPORTS
+import os
 from environment import RUNNINGONPI
 
 if RUNNINGONPI:

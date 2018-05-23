@@ -31,7 +31,7 @@ class Display(object):
         self._font = pygame.font.Font(None, 30)
         self._minifont = pygame.font.Font(None, 15)
         self._midifont = pygame.font.Font(None, 24)
-        self._screen = pygame.display.set_mode((self._WIDTH, self._HEIGHT))
+        self._screen = pygame.display.set_mode((self._WIDTH, self._HEIGHT), pygame.FULLSCREEN)
         return
 
     def __del__(self):
@@ -42,18 +42,18 @@ class Display(object):
         self._screen.fill(self._BGCOLOR)
         return
 
-    def setBackgroundColor(self, (r, g, b)):
+    def setBackgroundColor(self, r, g, b):
         self._BGCOLOR = (r, g, b)
         return
 
     _backgroundImage = {}
 
-    def setBackgroundImage(self, url, (x, y)):
+    def setBackgroundImage(self, url, x, y):
         self._backgroundImage = {'url': url, 'x': x, 'y': y}
-        self.displayImage(url, (x, y), True)
+        self.displayImage(url, x, y, True)
         return
 
-    def displayImage(self, url, (x, y), clearScreen):
+    def displayImage(self, url, x, y, clearScreen = True):
         if clearScreen:
             self.clear()
         image = pygame.image.load(url)
@@ -61,7 +61,7 @@ class Display(object):
         pygame.display.flip()
         return
 
-    def displayText(self, text, size, (x, y), color, bgcolor):
+    def displayText(self, text, size, x , y, color, bgcolor):
         font = pygame.font.Font(None, size)
         text = font.render(text, 1, color)
         rect = text.get_rect()
@@ -91,8 +91,9 @@ class Display(object):
     def clearMessage(self, key):
         #if last message is removed, rerender backround
         if(len(self._messageDict) == 1):
-            print "removing last message and rerender background"
-            self.displayImage(self._backgroundImage['url'], (self._backgroundImage['x'], self._backgroundImage['y']), True)
+            print("Removing last message and rerender background")
+            print(self._backgroundImage)
+            self.displayImage(self._backgroundImage['url'], self._backgroundImage['x'], self._backgroundImage['y'], True)
         self._messageDict.pop(key, None)
         return
 
@@ -130,7 +131,7 @@ class Display(object):
                 messageBoxBorderColor = self._CDRED
             pygame.draw.rect(self._screen, messageBoxBorderColor, [46, 0, 272, 42*messageCount+2], 2)
             pygame.draw.rect(self._screen, messageBoxFillColor, [48, 2, 270, 42*messageCount])
-            for message in self._messageDict.itervalues():
+            for message in self._messageDict.values():
                 messageText = self._font.render(message, 1, (0, 0, 0))
                 self._screen.blit(messageText, (62, 42*messageCount-30))
         pygame.display.flip()

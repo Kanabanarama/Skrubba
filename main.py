@@ -11,6 +11,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MI
 from shiftregister import Shiftregister
 from relay import Relay
 from db import DB
+from environment import RUNNINGONPI
 
 # change working directory to directory of this script so that images
 # relative paths can be found
@@ -18,7 +19,6 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
-from environment import RUNNINGONPI
 if RUNNINGONPI:
     from display import Display
 
@@ -37,7 +37,7 @@ logging.basicConfig()
 DEBUG = True
 
 def valveJob(setting): #(valve, onDuration)
-    print 'OPENING VALVE'
+    print('OPENING VALVE')
     tft.markActiveJob(setting['id'], True);
     durationLeft = int(setting['on_duration']) + 2
     #binaryValveList = map(int, list(format(setting['valve'], '08b')))
@@ -52,10 +52,10 @@ def valveJob(setting): #(valve, onDuration)
     while durationLeft > 2:
         time.sleep(1)
         durationLeft -= 1
-        print 'TIME LEFT: %i' % (durationLeft - 1)
-    print 'CLOSING VALVE'
+        print('TIME LEFT: %i' % (durationLeft - 1))
+    print('CLOSING VALVE')
     pump.off()
-    print 'reset shift register 1'
+    print('reset shift register 1')
     #valves.disable()
     valves.reset()
     time.sleep(1)
@@ -95,9 +95,8 @@ def restartJobManager():
         if config['on_time'] and config['on_duration'] and config['is_active']:
             if RUNNINGONPI:
               tft.displayJob(config)
-            timeComponents = map(int, config['on_time'].split(':'))
-            if(config['interval_type'] == 'daily'):
-                scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], second = timeComponents[2], args = [config])
+            timeComponents = [ int(x) for x in config['on_time'].split(':') ]
+            if(config['interval_type'] == 'daily'): scheduler.add_job(valveJob, 'cron', day_of_week = 'mon-sun', hour = timeComponents[0], minute = timeComponents[1], second = timeComponents[2], args = [config])
                 # print 'Scheduled daily job [%i:%i]' % (timeComponents[0], timeComponents[1])
             if(config['interval_type'] == 'weekly'):
                 scheduler.add_job(valveJob, 'cron', day_of_week = 'sun', hour = timeComponents[0], minute = timeComponents[1], second = timeComponents[2], args = [config])
@@ -113,7 +112,7 @@ def restartJobManager():
         while time.time() - displayTime < 5:
             time.sleep(1)
         tft.clear()
-        tft.setBackgroundImage('static/gfx/lcd-ui-background.png', (0, 0))
+        tft.setBackgroundImage('static/gfx/lcd-ui-background.png', x = 0,  y= 0)
         addTftJob()
 
     return
@@ -122,7 +121,7 @@ def addTftJob():
     def tftJob():
         #if(os.getenv('SSH_CLIENT')): // os.environ.get('SSH_CLIENT') // os.environ['SSH_CLIENT'] // nothing ?
         #    tft.displayText(os.getenv('SSH_CLIENT'), 24, (205, 30), (249, 116, 75), (0, 110, 46))
-        tft.displayText(time.strftime('%H:%M:%S'), 40, (205, 10), (255, 255, 255), (0, 110, 46))
+        tft.displayText(time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46))
         tft.updateJobDisplay()
         return
     scheduler.add_job(tftJob, 'interval', seconds = 1)
@@ -139,11 +138,11 @@ def requires_auth(f):
             return f(*args, **kwargs)
         else:
             headerAuthToken = request.headers.get('authentication')
-            print 'authToken: %s / Token validation result: %i' % (headerAuthToken, checkAuthToken(headerAuthToken))
+            print('authToken: %s / Token validation result: %i' % (headerAuthToken, checkAuthToken(headerAuthToken)))
             if not headerAuthToken or not checkAuthToken(headerAuthToken):
-                print 'return denyAccess()'
+                print('return denyAccess()')
                 return denyAccessToken()
-            print 'return f()'
+            print('return f()')
             return f(*args, **kwargs)
     return decorated
 
@@ -158,7 +157,7 @@ def isLoginRequired():
 
 def generateAuthToken(self, credentials, expiration = tokenExpiration):
     s = Serializer(app.config['SECRET_KEY'], expires_in = expiration)
-    print { 'username': credentials['username'] }
+    print("'username': credentials['username']")
     return s.dumps({ 'username': credentials['username'] })
 
 def checkAuthToken(authToken):
@@ -189,12 +188,15 @@ def actionLogin():
             if line['setting_name'] == 'password':
                 systemCredentials['password'] = line['setting_value']
 
+                print(systemCredentials['username'])
+                print(systemCredentials['password'])
+
         if len(systemCredentials) == 2 and requestUsername == systemCredentials['username'] and requestPassword == systemCredentials['password']:
-            print 'Login successful'
+            print('Login successful')
             token = generateAuthToken(request, systemCredentials, 600)
             response = json.dumps({ 'success': 'true', 'token': token })
         else:
-            print 'Login failed'
+            print('Login failed')
             response = json.dumps({ 'success': 'false', 'message': 'Invalid login.' })
     return response
 
@@ -202,14 +204,14 @@ def localhost_only(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         requestIp = request.remote_addr
-        print 'checking request origin: %s' % requestIp
+        print('checking request origin: %s' % requestIp)
         if DEBUG:
             allowed = True
         else:
             allowed = (requestIp == '127.0.0.1')
-        print 'allowed: %i' % allowed
+        print('allowed: %i' % allowed)
         if not allowed:
-            print 'return denyIp()' + requestIp
+            print('return denyIp()' + requestIp)
             return denyRequestIp()
         #print 'return f()'
         return f(*args, **kwargs)
@@ -354,7 +356,7 @@ def actionManualwatering():
         duration = params['duration']
         valves = Shiftregister()
         valves.outputBinary(valveNo)
-        print "OPENED VALVE %i" % valveNo
+        print("OPENED VALVE %i" % valveNo)
     response = json.dumps({ 'success': 'true' })
     return response
 
@@ -363,7 +365,7 @@ def actionManualwatering():
 @requires_auth
 @localhost_only
 def serveroff():
-    print 'SERVER SHUTTING DOWN'
+    print('SERVER SHUTTING DOWN')
     tft.displayMessage('SHUTDOWN SERVER')
     #unloadScheduler()
     unloadFlask()
@@ -373,7 +375,7 @@ def serveroff():
 @requires_auth
 @localhost_only
 def reboot():
-    print 'SYSTEM REBOOTING'
+    print('SYSTEM REBOOTING')
     tft.displayMessage('REBOOTING')
     #unloadScheduler()
     unloadFlask()
@@ -384,7 +386,7 @@ def reboot():
 @requires_auth
 @localhost_only
 def shutdown():
-    print 'SYSTEM SHUTDOWN'
+    print('SYSTEM SHUTDOWN')
     tft.displayMessage('SHUTDOWN SYSTEM')
     #unloadScheduler()
     unloadFlask()
@@ -396,7 +398,7 @@ def shutdown():
 ########################################################################################################################
 
 def unloadScheduler():
-    print 'Shutting down scheduler...'
+    print('Shutting down scheduler...')
     scheduler.shutdown()
     return
 
@@ -404,7 +406,7 @@ def unloadFlask():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
-    print 'Shutting down flask...'
+    print('Shutting down flask...')
     func()
     return
 
@@ -438,7 +440,7 @@ def index():
 
 def setupKeepaliveTracking():
     def trackBackendUserActivity():
-        for ip, counter in keepaliveCounters.iteritems():
+        for ip, counter in keepaliveCounters.items():
             keepaliveCounters[ip] -= 10
             if(RUNNINGONPI):
               if(keepaliveCounters[ip] > 0) :
@@ -457,7 +459,7 @@ def refreshKeepalive():
     return json.dumps({ 'success': 'true' })
 
 #import argparse
-
+#""
 if __name__ == "__main__":
     #parser = argparse.ArgumentParser(description = 'Let program simulate on local machine.')
     #parser.add_argument('local')
@@ -467,7 +469,7 @@ if __name__ == "__main__":
     if (not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'):
         if RUNNINGONPI:
             tft = Display()
-            tft.displayImage('static/gfx/lcd-skrubba-color.png', (67, 10), True)
+            tft.displayImage('static/gfx/lcd-skrubba-color.png', x = 67, y = 10, clearScreen = True)
             displayTime = time.time()
             # All valves off
             valves = Shiftregister()

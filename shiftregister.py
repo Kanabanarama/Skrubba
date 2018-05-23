@@ -6,6 +6,7 @@
 # by Kana kanabanarama@googlemail.com
 
 # IMPORTS
+import os
 from environment import RUNNINGONPI
 
 if RUNNINGONPI:
@@ -39,12 +40,10 @@ class Shiftregister(object):
         return
 
     def enable(self):
-        print "output enable"
         GPIO.output(self._OE, 0)
         return;
 
     def disable(self):
-        print 'output disable'
         GPIO.output(self._OE, 1)
         return
 

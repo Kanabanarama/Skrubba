@@ -5,7 +5,7 @@
 # Database is sqlite3
 # by Kana kanabanarama@googlemail.com
 
-import sqlite3, itertools, re, os
+import sqlite3, os
 
 class DB(object):
     _connection = None
@@ -62,7 +62,7 @@ class DB(object):
         self._cursor.execute('SELECT * FROM system_settings;')
         for row in self._cursor:
             # print row
-            rowDict = dict(itertools.izip(row.keys(), row))
+            rowDict = dict(zip(row.keys(), row))
             rows.append(rowDict)
         return rows
 
@@ -117,7 +117,7 @@ class DB(object):
         rows = []
         self._cursor.execute('SELECT * FROM valve_configs ORDER BY valve')
         for row in self._cursor:
-            rowDict = dict(itertools.izip(row.keys(), row))
+            rowDict = dict(zip(row.keys(), row))
             rows.append(rowDict)
         return rows
 
@@ -137,6 +137,6 @@ class DB(object):
         self._cursor.execute('SELECT valve_logs.* FROM valve_logs LEFT JOIN valve_configs ON (valve_logs.valve_config_id = valve_configs.id);')
         for row in self._cursor:
             # print row
-            rowDict = dict(itertools.izip(row.keys(), row))
+            rowDict = dict(zip(row.keys(), row))
             rows.append(rowDict)
         return rows
