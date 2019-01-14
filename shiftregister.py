@@ -7,14 +7,14 @@ by Kana kanabanarama@googlemail.com
 """
 
 import time
-from environment import RUNNINGONPI
+import environment
 
-if RUNNINGONPI:
-    import RPi.GPIO as GPIO
+if environment.RUNNINGONPI:
+    import RPi.GPIO         # pylint: disable=import-error,unused-import
 else:
-    import FakeRPi as GPIO
+    import FakeRPi as GPIO  # pylint: disable=import-error
 
-class Shiftregister(object):
+class Shiftregister():
     """
     Use shift register to control relays
     """
@@ -35,25 +35,21 @@ class Shiftregister(object):
         GPIO.setup(self._OE, GPIO.OUT)
         #GPIO.output(self._OE, 0) # enable output
         self.enable()
-        return
 
     def __del__(self):
-        GPIO.cleanup()
-        return
+        return GPIO.cleanup()
 
     def enable(self):
         """
         Enables GPIO output mode for shift register
         """
-        GPIO.output(self._OE, 0)
-        return
+        return GPIO.output(self._OE, 0)
 
     def disable(self):
         """
         Disables GPIO output mode for shift register
         """
-        GPIO.output(self._OE, 1)
-        return
+        return GPIO.output(self._OE, 1)
 
     def _pulse_clock(self):
         """
@@ -61,7 +57,8 @@ class Shiftregister(object):
         """
         GPIO.output(self._CLOCK, 1)
         GPIO.output(self._CLOCK, 0)
-        return
+
+        return True
 
     def _pulse_latch(self):
         """
@@ -69,7 +66,8 @@ class Shiftregister(object):
         """
         GPIO.output(self._LATCH, 1)
         GPIO.output(self._LATCH, 0)
-        return
+
+        return True
 
     def reset(self):
         """
@@ -79,7 +77,8 @@ class Shiftregister(object):
             GPIO.output(self._DATA, 1)
             self._pulse_clock()
         self._pulse_latch()
-        return
+
+        return True
 
     def output_decimal(self, decimal_value):
         """
@@ -87,7 +86,8 @@ class Shiftregister(object):
         """
         binary_value = 2**(int(decimal_value)-1)
         self.output_binary(binary_value)
-        return
+
+        return True
 
     def output_binary(self, binary_value):
         """
@@ -100,7 +100,8 @@ class Shiftregister(object):
             self._pulse_clock()
             binary_value = binary_value >> 1
         self._pulse_latch()
-        return
+
+        return True
 
     def output_list(self, value_list):
         """
@@ -111,7 +112,8 @@ class Shiftregister(object):
             if value_list[i] == 1:
                 value_list = binary_value | 2**i
         self.output_binary(binary_value)
-        return
+
+        return True
 
     def test_loop(self):
         """
@@ -123,4 +125,5 @@ class Shiftregister(object):
                 self.output_binary(bit_value)
                 bit_value = bit_value << 1
                 time.sleep(2)
-        return
+
+        return True
