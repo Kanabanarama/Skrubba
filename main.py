@@ -53,7 +53,7 @@ def valve_job(valve_setting): #(valve, onDuration)
     Open a valve specified with settings
     """
     print('OPENING VALVE')
-    TFT.markActiveJob(valve_setting['id'], True)
+    TFT.mark_active_job(valve_setting['id'], True)
     duration_left = int(valve_setting['on_duration']) + 2
     #binaryValveList = map(int, list(format(valve_setting['valve'], '08b')))
     #print binaryValveList
@@ -76,9 +76,9 @@ def valve_job(valve_setting): #(valve, onDuration)
     time.sleep(1)
 
     #VALVES.reset()
-    TFT.markActiveJob(valve_setting['id'], False)
+    TFT.mark_active_job(valve_setting['id'], False)
     store = DB()
-    store.addLogLine(valve_setting, datetime.now())
+    store.add_log_line(valve_setting, datetime.now())
 
     return True
 
@@ -111,15 +111,15 @@ def restart_job_manager():
     for job in SCHEDULER.get_jobs():
         SCHEDULER.remove_job(job.id)
     if RUNNINGONPI:
-        TFT.clearJobDisplay()
+        TFT.clear_job_display()
 
     # Add all jobs that are stored in database
     store = DB()
-    valve_configs = store.loadValveConfigs()
+    valve_configs = store.load_valve_configs()
     for config in valve_configs:
         if config['on_time'] and config['on_duration'] and config['is_active']:
             if RUNNINGONPI:
-                TFT.displayJob(config)
+                TFT.display_job(config)
             time_components = [int(x) for x in config['on_time'].split(':')]
             if config['interval_type'] == 'daily':
                 SCHEDULER.add_job(valve_job,
@@ -159,7 +159,7 @@ def restart_job_manager():
         while time.time() - display_time < 5:
             time.sleep(1)
         TFT.clear()
-        TFT.setBackgroundImage('static/gfx/lcd-ui-background.png', x=0, y=0)
+        TFT.set_background_image('static/gfx/lcd-ui-background.png', pos_x=0, pos_y=0)
         add_tft_job()
 
     return True
@@ -172,13 +172,14 @@ def add_tft_job():
         #if(os.getenv('SSH_CLIENT')):
         #    os.environ.get('SSH_CLIENT')
         #    os.environ['SSH_CLIENT'] // nothing ?
-        #    TFT.displayText(os.getenv('SSH_CLIENT'),
+        #    TFT.display_text(os.getenv('SSH_CLIENT'),
         #                              24,
         #                              (205, 30),
         #                              (249, 116, 75),
         #                              (0, 110, 46))
-        TFT.displayText(time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46))
-        TFT.updateJobDisplay()
+        # text, size, pos_x, pos_y, color, bg_color
+        TFT.display_text({time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46)})
+        TFT.update_job_display()
 
     SCHEDULER.add_job(tft_job, 'interval', seconds=1)
 
@@ -212,7 +213,7 @@ def is_login_required():
     """
     store = DB()
     login_required = False
-    for line in store.loadSystemSettings():
+    for line in store.get_system_settings():
         if line['setting_name'] == 'username':
             login_required = True
             break
@@ -260,7 +261,7 @@ def action_login():
 
         system_credentials = {}
         store = DB()
-        for line in store.loadSystemSettings():
+        for line in store.get_system_settings():
             if line['setting_name'] == 'username':
                 system_credentials['username'] = line['setting_value']
             if line['setting_name'] == 'password':
@@ -324,7 +325,7 @@ def plant():
     action = request.args.get('action')
 
     if action == 'read':
-        valve_configs = store.loadValveConfigs()
+        valve_configs = store.load_valve_configs()
         # print('READ VALVE CONFIG:')
         # print(valve_configs)
         response = json.dumps({'plant': valve_configs})
@@ -333,12 +334,12 @@ def plant():
         json_valve_configs_from_request = request.form['plant']
         valve_configs = json.loads(json_valve_configs_from_request)
         # check if valves can be added (system_settings.valve_amount)
-        max_valves = store.getMaxValveCountSetting()
-        actual_valves = store.getValveCount()
+        max_valves = store.get_max_valve_count_setting()
+        actual_valves = store.get_valve_count()
         if not max_valves or actual_valves < max_valves:
             # print('CREATED VALVE CONFIG:')
             # print(valve_configs)
-            new_entry = store.addValveConfig(valve_configs)
+            new_entry = store.add_valve_config(valve_configs)
             if new_entry:
                 restart_job_manager()
                 response_obj = {'success': 'true', 'plant': new_entry}
@@ -355,7 +356,7 @@ def plant():
         valve_configs = json.loads(json_valve_configs_from_request)
         # print('UPDATED VALVE CONFIG:')
         # print(valve_configs)
-        success = store.saveValveConfig(valve_configs)
+        success = store.update_valve_config(valve_configs)
         if success:
             restart_job_manager()
             response_obj = {'success': 'true'}
@@ -371,7 +372,7 @@ def plant():
         valve_configs = json.loads(json_valve_configs_from_request)
         # print('DELETED VALVE CONFIG:')
         # print(valve_configs)
-        success = store.deleteValveConfig(valve_configs['id'])
+        success = store.delete_valve_config(valve_configs['id'])
         restart_job_manager()
         response = json.dumps({'success': str(success).lower()})
 
@@ -387,7 +388,7 @@ def log():
     store = DB()
     action = request.args.get('action')
     if action == 'read':
-        logs = store.loadLogs()
+        logs = store.load_logs()
         # print('READ LOGS:')
         # print(logs)
         response = json.dumps({'log': logs})
@@ -399,54 +400,76 @@ def log():
 @localhost_only
 def setting():
     """
-    Read, update and delete the settings stored in the database
+    Handle the settings requests
     """
-    store = DB()
     action = request.args.get('action')
     if action == 'read':
-        settings = {}
-        # print('READ SYSTEM CONF:')
-        for line in store.loadSystemSettings():
-            if line['setting_name'] == 'password':
-                continue
-            settings.update({line['setting_name']: line['setting_value']})
-        response = json.dumps({'setting': [settings]})
-        # print response
-    elif action == 'update':
-        if request.method == 'POST':
-            json_credentials = request.form['setting']
-            params = json.loads(json_credentials)
-            response = json.dumps({'success': 'false'})
-            if 'username' in params:
-                credential_username = params['username']
-                store.updateSystemSettings('username', credential_username)
-                response = json.dumps({'success': 'true'})
-            if 'password' in params:
-                credential_password = params['password']
-                store.updateSystemSettings('password', credential_password)
-                response = json.dumps({'success': 'true'})
-            if 'valve_amount' in params:
-                valve_amount = int(params['valve_amount'])
-                actual_valves = store.getValveCount()
-                if actual_valves <= valve_amount:
-                    store.updateSystemSettings('valve_amount', valve_amount)
-                    response = json.dumps({'success': 'true'})
-                else:
-                    response = json.dumps({'success': 'false',
-                                           'message': 'There are more valves '\
-                                           'set up than you want to allow.'\
-                                           'Please remove some of them first.'})
-    elif action == 'destroy':
-        if request.method == 'POST':
-            json_credentials = request.form['setting']
-            params = json.loads(json_credentials)
-            #print(params)
-            #for setting in params:
-            for key, value in params.items():
-                #print('checking: %s / %s' % (key, value))
-                if value == '-DELETE-':
-                    store.deleteSystemSetting(key)
+        response = setting_read()
+    elif action == 'update' and request.method == 'POST':
+        response = setting_update()
+    elif action == 'destroy' and request.method == 'POST':
+        response = setting_delete()
+
+    return response
+
+def setting_read():
+    """
+    Read settings stored in the database
+    """
+    store = DB()
+    settings = {}
+    # print('READ SYSTEM CONF:')
+    for line in store.get_system_settings():
+        if line['setting_name'] == 'password':
+            continue
+        settings.update({line['setting_name']: line['setting_value']})
+
+    return json.dumps({'setting': [settings]})
+
+def setting_update():
+    """
+    Update settings stored in the database
+    """
+    store = DB()
+    json_credentials = request.form['setting']
+    params = json.loads(json_credentials)
+    response = json.dumps({'success': 'false'})
+    if 'username' in params:
+        credential_username = params['username']
+        store.update_system_settings('username', credential_username)
+        response = json.dumps({'success': 'true'})
+    if 'password' in params:
+        credential_password = params['password']
+        store.update_system_settings('password', credential_password)
+        response = json.dumps({'success': 'true'})
+    if 'valve_amount' in params:
+        valve_amount = int(params['valve_amount'])
+        actual_valves = store.get_valve_count()
+        if actual_valves <= valve_amount:
+            store.update_system_settings('valve_amount', valve_amount)
             response = json.dumps({'success': 'true'})
+        else:
+            response = json.dumps({'success': 'false',
+                                   'message': 'There are more valves '\
+                                   'set up than you want to allow.'\
+                                   'Please remove some of them first.'})
+
+    return response
+
+def setting_delete():
+    """
+    Delete settings stored in the database
+    """
+    store = DB()
+    json_credentials = request.form['setting']
+    params = json.loads(json_credentials)
+    #print(params)
+    #for setting in params:
+    for key, value in params.items():
+        #print('checking: %s / %s' % (key, value))
+        if value == '-DELETE-':
+            store.delete_system_setting(key)
+    response = json.dumps({'success': 'true'})
 
     return response
 
@@ -479,7 +502,7 @@ def serveroff():
     Exit flask only
     """
     print('SERVER SHUTTING DOWN')
-    TFT.displayMessage('SHUTDOWN SERVER')
+    TFT.display_message('SHUTDOWN SERVER')
     #unload_scheduler()
     unload_flask()
     return json.dumps({'success': 'true'})
@@ -492,7 +515,7 @@ def reboot():
     Call cleanup and reboot system
     """
     print('SYSTEM REBOOTING')
-    TFT.displayMessage('REBOOTING')
+    TFT.display_message('REBOOTING')
     #unload_scheduler()
     unload_flask()
     os.system("reboot")
@@ -507,7 +530,7 @@ def shutdown():
     Call cleanup and shutdown system
     """
     print('SYSTEM SHUTDOWN')
-    TFT.displayMessage('SHUTDOWN SYSTEM')
+    TFT.display_message('SHUTDOWN SYSTEM')
     #unload_scheduler()
     unload_flask()
     os.system("poweroff")
@@ -576,9 +599,9 @@ def setup_backend_user_tracking():
             KEEPALIVE_COUNTERS[client_ip] -= 10
             if RUNNINGONPI:
                 if KEEPALIVE_COUNTERS[client_ip] > 0:
-                    TFT.displayMessage(client_ip, client_ip + ' is logged in.')
+                    TFT.display_message(client_ip + ' is logged in.')
                 else:
-                    TFT.clearMessage(client_ip)
+                    TFT.clear_message(client_ip)
     SCHEDULER.add_job(track_active_backend_users, 'interval', seconds=10)
 
 KEEPALIVE_COUNTERS = {}
@@ -603,7 +626,8 @@ if __name__ == "__main__":
     if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         if RUNNINGONPI:
             TFT = Display()
-            TFT.displayImage('static/gfx/lcd-skrubba-color.png', x=67, y=10, clearScreen=True)
+            TFT.display_image('static/gfx/lcd-skrubba-color.png',
+                              pos_x=67, pos_y=10, clear_screen=True)
             # All valves off
             VALVES = Shiftregister()
         if not SCHEDULER.running:
