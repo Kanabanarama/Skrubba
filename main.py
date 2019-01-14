@@ -48,25 +48,22 @@ if DEBUG:
 
 logging.basicConfig()
 
-DEBUG = True
-DISPLAYACCESS = False
-
 def valve_job(valve_setting): #(valve, onDuration)
     """
     Open a valve specified with settings
     """
     print('OPENING VALVE')
-    tft.markActiveJob(valve_setting['id'], True)
+    TFT.markActiveJob(valve_setting['id'], True)
     duration_left = int(valve_setting['on_duration']) + 2
     #binaryValveList = map(int, list(format(valve_setting['valve'], '08b')))
     #print binaryValveList
     pump = Relay()
     pump.switch_on()
     time.sleep(1)
-    #valves = Shiftregister()
-    #shiftreg.outputList(binaryValveList)
-    valves.output_decimal(valve_setting['valve'])
-    #valves.enable()
+    #VALVES = Shiftregister()
+    #shiftreg.output_list(binaryValveList)
+    VALVES.output_decimal(valve_setting['valve'])
+    #VALVES.enable()
     while duration_left > 2:
         time.sleep(1)
         duration_left -= 1
@@ -74,12 +71,12 @@ def valve_job(valve_setting): #(valve, onDuration)
     print('CLOSING VALVE')
     pump.switch_off()
     print('reset shift register 1')
-    #valves.disable()
-    valves.reset()
+    #VALVES.disable()
+    VALVES.reset()
     time.sleep(1)
 
-    #valves.reset()
-    tft.markActiveJob(valve_setting['id'], False)
+    #VALVES.reset()
+    TFT.markActiveJob(valve_setting['id'], False)
     store = DB()
     store.addLogLine(valve_setting, datetime.now())
 
@@ -92,7 +89,7 @@ def start_scheduler():
     """
     SCHEDULER.start()
     SCHEDULER.add_listener(scheduler_job_event_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
-    atexit.register(unloadScheduler)
+    atexit.register(unload_scheduler)
 
     return True
 
@@ -109,10 +106,12 @@ def restart_job_manager():
     """
     Remove all jobs
     """
+    display_time = time.time()
+
     for job in SCHEDULER.get_jobs():
         SCHEDULER.remove_job(job.id)
     if RUNNINGONPI:
-        tft.clearJobDisplay()
+        TFT.clearJobDisplay()
 
     # Add all jobs that are stored in database
     store = DB()
@@ -120,7 +119,7 @@ def restart_job_manager():
     for config in valve_configs:
         if config['on_time'] and config['on_duration'] and config['is_active']:
             if RUNNINGONPI:
-                tft.displayJob(config)
+                TFT.displayJob(config)
             time_components = [int(x) for x in config['on_time'].split(':')]
             if config['interval_type'] == 'daily':
                 SCHEDULER.add_job(valve_job,
@@ -157,27 +156,30 @@ def restart_job_manager():
     # print(SCHEDULER.get_jobs())
 
     if RUNNINGONPI:
-        while time.time() - displayTime < 5:
+        while time.time() - display_time < 5:
             time.sleep(1)
-        tft.clear()
-        tft.setBackgroundImage('static/gfx/lcd-ui-background.png', x=0, y=0)
+        TFT.clear()
+        TFT.setBackgroundImage('static/gfx/lcd-ui-background.png', x=0, y=0)
         add_tft_job()
 
     return True
 
 def add_tft_job():
+    """
+    Job for updating tft display
+    """
     def tft_job():
         #if(os.getenv('SSH_CLIENT')):
         #    os.environ.get('SSH_CLIENT')
         #    os.environ['SSH_CLIENT'] // nothing ?
-        #    tft.displayText(os.getenv('SSH_CLIENT'),
+        #    TFT.displayText(os.getenv('SSH_CLIENT'),
         #                              24,
         #                              (205, 30),
         #                              (249, 116, 75),
         #                              (0, 110, 46))
-        tft.displayText(time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46))
-        tft.updateJobDisplay()
-        return
+        TFT.displayText(time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46))
+        TFT.updateJobDisplay()
+
     SCHEDULER.add_job(tft_job, 'interval', seconds=1)
 
     return True
@@ -186,41 +188,53 @@ def add_tft_job():
 # Authentication
 ################################################################################
 
-def requires_auth(f):
-    @wraps(f)
+def requires_auth(func):
+    """
+    Decorator for endpoints that require authentication
+    """
+    @wraps(func)
     def decorated(*args, **kwargs):
         if not is_login_required():
-            return f(*args, **kwargs)
-        else:
-            headerAuthToken = request.headers.get('authentication')
-            if not headerAuthToken or not check_auth_token(headerAuthToken):
-                print('return denyAccess()')
-                return deny_access_token()
-            print('return f()')
-            return f(*args, **kwargs)
+            return func(*args, **kwargs)
+
+        header_auth_token = request.headers.get('authentication')
+        if not header_auth_token or not check_auth_token(header_auth_token):
+            print('return deny_access_token()')
+            return deny_access_token()
+        print('return func()')
+        return func(*args, **kwargs)
 
     return decorated
 
 def is_login_required():
+    """
+    Checks if user credentials are required
+    """
     store = DB()
-    loginRequired = False
+    login_required = False
     for line in store.loadSystemSettings():
         if line['setting_name'] == 'username':
-            loginRequired = True
+            login_required = True
             break
 
-    return loginRequired
+    return login_required
 
-def generate_auth_token(self, credentials, expiration=TOKEN_EXPIRATION):
-    s = Serializer(APP.config['SECRET_KEY'], expires_in=expiration)
+def generate_auth_token(credentials, expiration=TOKEN_EXPIRATION):
+    """
+    Generates the auth token
+    """
+    serializer = Serializer(APP.config['SECRET_KEY'], expires_in=expiration)
     print("'username': credentials['username']")
 
-    return s.dumps({'username': credentials['username']})
+    return serializer.dumps({'username': credentials['username']})
 
-def check_auth_token(authToken):
-    s = Serializer(APP.config['SECRET_KEY'])
+def check_auth_token(auth_token):
+    """
+    Checks if the auth token is valid and has not expired
+    """
+    serializer = Serializer(APP.config['SECRET_KEY'])
     try:
-        data = s.loads(authToken)
+        serializer.loads(auth_token)
     except SignatureExpired:
         return False # valid token, but expired
     except BadSignature:
@@ -229,31 +243,37 @@ def check_auth_token(authToken):
     return True
 
 def deny_access_token():
+    """
+    Returns an invalid token message
+    """
     return json.dumps({'success': 'false', 'message': 'Authentication failed.'})
 
 @APP.route("/action/login", methods=['GET', 'POST'])
-def actionLogin():
+def action_login():
+    """
+    Handles login requests and checks against the credentials stored in database
+    """
     if request.method == 'POST':
         params = request.get_json()
-        requestUsername = params['username']
-        requestPassword = params['password']
+        request_username = params['username']
+        request_password = params['password']
 
-        systemCredentials = {}
+        system_credentials = {}
         store = DB()
         for line in store.loadSystemSettings():
             if line['setting_name'] == 'username':
-                systemCredentials['username'] = line['setting_value']
+                system_credentials['username'] = line['setting_value']
             if line['setting_name'] == 'password':
-                systemCredentials['password'] = line['setting_value']
+                system_credentials['password'] = line['setting_value']
 
-                print(systemCredentials['username'])
-                print(systemCredentials['password'])
+                print(system_credentials['username'])
+                print(system_credentials['password'])
 
-        if len(systemCredentials) == 2 \
-                and requestUsername == systemCredentials['username'] \
-                and requestPassword == systemCredentials['password']:
+        if len(system_credentials) == 2 \
+                and request_username == system_credentials['username'] \
+                and request_password == system_credentials['password']:
             print('Login successful')
-            token = generate_auth_token(request, systemCredentials, 600)
+            token = generate_auth_token(system_credentials, 600)
             response = json.dumps({'success': 'true', 'token': token})
         else:
             print('Login failed')
@@ -261,24 +281,30 @@ def actionLogin():
 
     return response
 
-def localhost_only(f):
-    @wraps(f)
+def localhost_only(func):
+    """
+    Decorator for allowing requests from localhost
+    """
+    @wraps(func)
     def decorated(*args, **kwargs):
-        requestIp = request.remote_addr
-        print('checking request origin: %s' % requestIp)
+        request_ip = request.remote_addr
+        print('checking request origin: %s' % request_ip)
         if DEBUG:
             allowed = True
         else:
-            allowed = (requestIp == '127.0.0.1')
+            allowed = (request_ip == '127.0.0.1')
         print('allowed: %i' % allowed)
         if not allowed:
-            print('return denyIp()' + requestIp)
+            print('return denyIp()' + request_ip)
             return deny_request_ip()
-        #print('return f()')
-        return f(*args, **kwargs)
+        #print('return func()')
+        return func(*args, **kwargs)
     return decorated
 
 def deny_request_ip():
+    """
+    Returns an access denied message
+    """
     return json.dumps({'success': 'false',
                        'message': 'Requests from remote hosts are not allowed.'
                       })
@@ -291,58 +317,61 @@ def deny_request_ip():
 @requires_auth
 @localhost_only
 def plant():
+    """
+    Handles all request actions for a plant entry
+    """
     store = DB()
     action = request.args.get('action')
 
     if action == 'read':
-        valveConfigs = store.loadValveConfigs()
+        valve_configs = store.loadValveConfigs()
         # print('READ VALVE CONFIG:')
-        # print(valveConfigs)
-        response = json.dumps({'plant': valveConfigs})
+        # print(valve_configs)
+        response = json.dumps({'plant': valve_configs})
 
     elif action == 'create':
-        jsonValveConfigs = request.form['plant']
-        valveConfig = json.loads(jsonValveConfigs)
+        json_valve_configs_from_request = request.form['plant']
+        valve_configs = json.loads(json_valve_configs_from_request)
         # check if valves can be added (system_settings.valve_amount)
-        maxValves = store.getMaxValveCountSetting()
-        actualValves = store.getValveCount()
-        if not maxValves or actualValves < maxValves:
+        max_valves = store.getMaxValveCountSetting()
+        actual_valves = store.getValveCount()
+        if not max_valves or actual_valves < max_valves:
             # print('CREATED VALVE CONFIG:')
-            # print valveConfig
-            newRow = store.addValveConfig(valveConfig)
-            if len(newRow):
+            # print(valve_configs)
+            new_entry = store.addValveConfig(valve_configs)
+            if new_entry:
                 restart_job_manager()
-                responseObj = {'success': 'true', 'plant': newRow}
+                response_obj = {'success': 'true', 'plant': new_entry}
             else:
-                responseObj = {'success': 'false'}
+                response_obj = {'success': 'false'}
         else:
-            responseObj = {'success': 'false',
-                           'message': 'No more entrys to add, maximum entries '\
-                           'can be configured in settings.'}
-        response = json.dumps(responseObj)
+            response_obj = {'success': 'false',
+                            'message': 'No more entrys to add, maximum entries '\
+                            'can be configured in settings.'}
+        response = json.dumps(response_obj)
 
     elif action == 'update':
-        jsonValveConfigs = request.form['plant']
-        valveConfig = json.loads(jsonValveConfigs)
+        json_valve_configs_from_request = request.form['plant']
+        valve_configs = json.loads(json_valve_configs_from_request)
         # print('UPDATED VALVE CONFIG:')
-        # print(valveConfig)
-        success = store.saveValveConfig(valveConfig)
+        # print(valve_configs)
+        success = store.saveValveConfig(valve_configs)
         if success:
             restart_job_manager()
-            responseObj = {'success': 'true'}
+            response_obj = {'success': 'true'}
         else:
-            responseObj = {'success': 'false',
-                           'message': 'Valve already used by another entry.'}
-        response = json.dumps(responseObj)
+            response_obj = {'success': 'false',
+                            'message': 'Valve already used by another entry.'}
+        response = json.dumps(response_obj)
         #{'success': 'false', 'message': }#, 500
         #'metaData': { 'messageProperty': 'msg', 'successProperty': 'success' }
 
     elif action == 'destroy':
-        jsonValveConfigs = request.form['plant']
-        valveConfig = json.loads(jsonValveConfigs)
+        json_valve_configs_from_request = request.form['plant']
+        valve_configs = json.loads(json_valve_configs_from_request)
         # print('DELETED VALVE CONFIG:')
-        # print valveConfig
-        success = store.deleteValveConfig(valveConfig['id'])
+        # print(valve_configs)
+        success = store.deleteValveConfig(valve_configs['id'])
         restart_job_manager()
         response = json.dumps({'success': str(success).lower()})
 
@@ -352,6 +381,9 @@ def plant():
 @requires_auth
 @localhost_only
 def log():
+    """
+    Read the logs stored in the database
+    """
     store = DB()
     action = request.args.get('action')
     if action == 'read':
@@ -366,6 +398,9 @@ def log():
 #@requires_auth
 @localhost_only
 def setting():
+    """
+    Read, update and delete the settings stored in the database
+    """
     store = DB()
     action = request.args.get('action')
     if action == 'read':
@@ -379,22 +414,22 @@ def setting():
         # print response
     elif action == 'update':
         if request.method == 'POST':
-            jsonCredentials = request.form['setting']
-            params = json.loads(jsonCredentials)
+            json_credentials = request.form['setting']
+            params = json.loads(json_credentials)
             response = json.dumps({'success': 'false'})
             if 'username' in params:
-                credentialUsername = params['username']
-                store.updateSystemSettings('username', credentialUsername)
+                credential_username = params['username']
+                store.updateSystemSettings('username', credential_username)
                 response = json.dumps({'success': 'true'})
             if 'password' in params:
-                credentialPassword = params['password']
-                store.updateSystemSettings('password', credentialPassword)
+                credential_password = params['password']
+                store.updateSystemSettings('password', credential_password)
                 response = json.dumps({'success': 'true'})
             if 'valve_amount' in params:
-                valveAmount = int(params['valve_amount'])
-                actualValves = store.getValveCount()
-                if actualValves <= valveAmount:
-                    store.updateSystemSettings('valve_amount', valveAmount)
+                valve_amount = int(params['valve_amount'])
+                actual_valves = store.getValveCount()
+                if actual_valves <= valve_amount:
+                    store.updateSystemSettings('valve_amount', valve_amount)
                     response = json.dumps({'success': 'true'})
                 else:
                     response = json.dumps({'success': 'false',
@@ -403,8 +438,8 @@ def setting():
                                            'Please remove some of them first.'})
     elif action == 'destroy':
         if request.method == 'POST':
-            jsonCredentials = request.form['setting']
-            params = json.loads(jsonCredentials)
+            json_credentials = request.form['setting']
+            params = json.loads(json_credentials)
             #print(params)
             #for setting in params:
             for key, value in params.items():
@@ -422,14 +457,15 @@ def setting():
 @APP.route("/action/manualwatering", methods=['GET', 'POST'])
 @requires_auth
 @localhost_only
-def actionManualwatering():
+def action_manualwatering():
+    """
+    Manually open a valve (but not the pump) by request for testing
+    """
     if request.method == 'POST':
         params = request.get_json()
-        valveNo = params['valve']
-        duration = params['duration']
-        valves = Shiftregister()
-        valves.outputBinary(valveNo)
-        print("OPENED VALVE %i" % valveNo)
+        valve_no = params['valve']
+        VALVES.output_binary(valve_no)
+        print("OPENED VALVE %i" % valve_no)
     response = json.dumps({'success': 'true'})
 
     return response
@@ -439,20 +475,26 @@ def actionManualwatering():
 @requires_auth
 @localhost_only
 def serveroff():
+    """
+    Exit flask only
+    """
     print('SERVER SHUTTING DOWN')
-    tft.displayMessage('SHUTDOWN SERVER')
-    #unloadScheduler()
-    unloadFlask()
+    TFT.displayMessage('SHUTDOWN SERVER')
+    #unload_scheduler()
+    unload_flask()
     return json.dumps({'success': 'true'})
 
 @APP.route('/action/reboot', methods=['POST'])
 @requires_auth
 @localhost_only
 def reboot():
+    """
+    Call cleanup and reboot system
+    """
     print('SYSTEM REBOOTING')
-    tft.displayMessage('REBOOTING')
-    #unloadScheduler()
-    unloadFlask()
+    TFT.displayMessage('REBOOTING')
+    #unload_scheduler()
+    unload_flask()
     os.system("reboot")
 
     return json.dumps({'success': 'true'})
@@ -461,10 +503,13 @@ def reboot():
 @requires_auth
 @localhost_only
 def shutdown():
+    """
+    Call cleanup and shutdown system
+    """
     print('SYSTEM SHUTDOWN')
-    tft.displayMessage('SHUTDOWN SYSTEM')
-    #unloadScheduler()
-    unloadFlask()
+    TFT.displayMessage('SHUTDOWN SYSTEM')
+    #unload_scheduler()
+    unload_flask()
     os.system("poweroff")
 
     return json.dumps({'success': 'true'})
@@ -473,13 +518,19 @@ def shutdown():
 # Unloading
 ################################################################################
 
-def unloadScheduler():
+def unload_scheduler():
+    """
+    Scheduler cleanups
+    """
     print('Shutting down scheduler...')
     SCHEDULER.shutdown()
 
     return True
 
-def unloadFlask():
+def unload_flask():
+    """
+    Flask cleanup
+    """
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
@@ -488,9 +539,9 @@ def unloadFlask():
 
     return True
 
-'''def postServerOffRequest():
-    response = APP.test_client().post('/serveroff')
-    return response'''
+#def postServerOffRequest():
+#    response = APP.test_client().post('/serveroff')
+#    return response'''
 
 ################################################################################
 # Flask main
@@ -499,33 +550,46 @@ def unloadFlask():
 # Serve favicon from static folder
 @APP.route('/favicon.ico')
 def favicon():
-    faviconPath = os.path.join(APP.root_path, 'static')
-    return send_from_directory(faviconPath, 'gfx/favicon.ico', mimetype='image/vnd.microsoft.icon')
+    """
+    Serve favicon
+    """
+    favicon_path = os.path.join(APP.root_path, 'static')
+    return send_from_directory(favicon_path, 'gfx/favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 # Serve index page
 @APP.route("/", methods=['GET', 'POST'])
 def index():
-    #print("user /")
+    """
+    Serve the backend
+    """
     return render_template('index.html')
 
-def setupKeepaliveTracking():
-    def trackBackendUserActivity():
-        for ip, counter in keepaliveCounters.items():
-            keepaliveCounters[ip] -= 10
-            if RUNNINGONPI and DISPLAYACCESS:
-                if keepaliveCounters[ip] > 0:
-                    tft.displayMessage(ip, ip + ' is logged in.')
+def setup_backend_user_tracking():
+    """
+    Show IP's on tft display when users are using the backend
+    """
+    def track_active_backend_users():
+        """
+        Use keepalive info holding the client IP's
+        """
+        for client_ip in KEEPALIVE_COUNTERS.items():
+            KEEPALIVE_COUNTERS[client_ip] -= 10
+            if RUNNINGONPI:
+                if KEEPALIVE_COUNTERS[client_ip] > 0:
+                    TFT.displayMessage(client_ip, client_ip + ' is logged in.')
                 else:
-                    tft.clearMessage(ip)
-    SCHEDULER.add_job(trackBackendUserActivity, 'interval', seconds=10)
-    return
+                    TFT.clearMessage(client_ip)
+    SCHEDULER.add_job(track_active_backend_users, 'interval', seconds=10)
 
-keepaliveCounters = {}
+KEEPALIVE_COUNTERS = {}
 
 #@APP.before_request
 @APP.route("/keepalive", methods=['GET'])
-def refreshKeepalive():
-    keepaliveCounters[request.remote_addr] = 11
+def refresh_keepalive():
+    """
+    Refresh keepalive
+    """
+    KEEPALIVE_COUNTERS[request.remote_addr] = 11
     return json.dumps({'success': 'true'})
 
 #import argparse
@@ -538,13 +602,12 @@ if __name__ == "__main__":
     #exit;
     if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         if RUNNINGONPI:
-            tft = Display()
-            tft.displayImage('static/gfx/lcd-skrubba-color.png', x=67, y=10, clearScreen=True)
-            displayTime = time.time()
+            TFT = Display()
+            TFT.displayImage('static/gfx/lcd-skrubba-color.png', x=67, y=10, clearScreen=True)
             # All valves off
-            valves = Shiftregister()
+            VALVES = Shiftregister()
         if not SCHEDULER.running:
             start_scheduler()
             restart_job_manager()
-            setupKeepaliveTracking()
+            setup_backend_user_tracking()
     APP.run(host='0.0.0.0', port=80 if RUNNINGONPI else 2525, debug=DEBUG)
