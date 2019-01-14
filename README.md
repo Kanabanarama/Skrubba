@@ -27,6 +27,12 @@ Backend for Raspberry Pi based plant irrigation system
 
 https://www.raspberrypi.org/downloads/raspbian/
 
+1.1 Set timezone
+
+# List timezones with: timedatectl list-timezones
+# Set your timezone with: sudo timedatectl set-timezone <your timezone>
+sudo timedatectl set-timezone Europe/Paris
+
 2. On the "boot" partition of your raspberry, create a file "ssh".
 
 3. Create a file wpa_supplicant.conf with the content below:
