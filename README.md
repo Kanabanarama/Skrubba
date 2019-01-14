@@ -1,5 +1,7 @@
 # Skrubba
 
+[![Build Status](https://scrutinizer-ci.com/g/Kanabanarama/Skrubba/badges/build.png?b=master)](https://scrutinizer-ci.com/g/Kanabanarama/Skrubba/build-status/master) [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/Kanabanarama/Skrubba/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/Kanabanarama/Skrubba/?branch=master)
+
 Backend for Raspberry Pi based plant irrigation system
 
 #### HARDWARE:
