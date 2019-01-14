@@ -8,19 +8,25 @@ by Kana kanabanarama@googlemail.com
 
 import os
 import time
-import pygame
+import pygame   # pylint: disable=import-error
 
-class Display(object):
+class Display():
     """
     Control display to show status information
     """
-    _WIDTH = 320
-    _HEIGHT = 240
-    _BGCOLOR = (255, 255, 255)
+    _width = 320
+    _height = 240
 
-    _CDRED = (249, 116, 75)
-    _CDGREEN = (0, 110, 46)
-    _CDBLUE = (79, 145, 196)
+    _bg_color = (255, 255, 255)
+    _cdred = (249, 116, 75)
+    _cdgreen = (0, 110, 46)
+    _cdblue = (79, 145, 196)
+    _cdactive = (74, 74, 74)
+
+    _background_image = {}
+
+    _job_dict = []
+    _active_jobs = []
 
     def __init__(self):
         os.environ['SDL_FBDEV'] = '/dev/fb1'
@@ -30,145 +36,204 @@ class Display(object):
         self._font = pygame.font.Font(None, 30)
         self._minifont = pygame.font.Font(None, 15)
         self._midifont = pygame.font.Font(None, 24)
-        self._screen = pygame.display.set_mode((self._WIDTH, self._HEIGHT), pygame.FULLSCREEN)
-        return
+        self._screen = pygame.display.set_mode((self._width, self._height), pygame.FULLSCREEN)
 
     def __del__(self):
+        """
+        Cleanup
+        """
         # cleanup
-        return
+
+        return True
 
     def clear(self):
-        self._screen.fill(self._BGCOLOR)
-        return
+        """
+        Clears screen by filling it with the default background color
+        """
+        self._screen.fill(self._bg_color)
 
-    def setBackgroundColor(self, r, g, b):
-        self._BGCOLOR = (r, g, b)
-        return
+        return self
 
-    _backgroundImage = {}
+    def set_background_color(self, color_r, color_g, color_b):
+        """
+        Set default background color
+        """
+        self._bg_color = (color_r, color_g, color_b)
 
-    def setBackgroundImage(self, url, x, y):
-        self._backgroundImage = {'url': url, 'x': x, 'y': y}
-        self.displayImage(url, x, y, True)
-        return
+        return self
 
-    def displayImage(self, url, x, y, clearScreen=True):
-        if clearScreen:
+    def set_background_image(self, url, pos_x, pos_y):
+        """
+        Sets default background image
+        """
+        self._background_image = {'url': url, 'x': pos_x, 'y': pos_y}
+        self.display_image(url, pos_x, pos_y, True)
+        return self
+
+    def display_image(self, url, pos_x, pos_y, clear_screen=True):
+        """
+        Displays an image at position x/y
+        """
+        if clear_screen:
             self.clear()
         image = pygame.image.load(url)
-        self._screen.blit(image, (x, y))
+        self._screen.blit(image, (pos_x, pos_y))
         pygame.display.flip()
-        return
 
-    def displayText(self, text, size, x, y, color, bgcolor):
-        font = pygame.font.Font(None, size)
-        text = font.render(text, 1, color)
+        return self
+
+    def display_text(self, text):
+        """
+        Displays text at position x/y
+        """
+        font = pygame.font.Font(None, text.size)
+        text = font.render(text.content, 1, text.color)
         rect = text.get_rect()
-        pygame.draw.rect(self._screen, bgcolor, [x, y, rect.width, rect.height])
-        self._screen.blit(text, (x, y))
+        pygame.draw.rect(self._screen, text.bg_color,
+                         [text.pos_x, text.pos_y, rect.width, rect.height])
+        self._screen.blit(text, (text.pos_x, text.pos_y))
         #pygame.display.flip()
-        return
 
-    _jobDict = []
-    _activeJobs = []
+        return self
 
-    def clearJobDisplay(self):
-        del self._jobDict[:]
-        return
+    def clear_job_display(self):
+        """
+        Unsets all lines for job displaying
+        """
+        del self._job_dict[:]
 
-    def displayJob(self, jobConfig):
-        self._jobDict.append(jobConfig)
-        return
+        return self
 
-    _messageDict = {}
+    def display_job(self, job_config):
+        """
+        Adds a line to job displaying
+        """
+        self._job_dict.append(job_config)
 
-    def displayMessage(self, key, message):
-        #self._messageDict.update({key, message})
-        self._messageDict[key] = message
-        return
+        return self
 
-    def clearMessage(self, key):
-        #if last message is removed, rerender backround
-        if len(self._messageDict) == 1:
+    _message_dict = {}
+
+    def display_message(self, message):
+        """
+        Adds a message
+        """
+        #self._message_dict.update({key, message})
+        #self._message_dict[key] = message
+        self._message_dict[len(self._message_dict)+1] = message
+
+        return self
+
+    def clear_message(self, key):
+        """
+        Removes message with a key
+        If last message is removed, rerenders backround
+        """
+        if len(self._message_dict) == 1:
             print("Removing last message and rerender background")
-            print(self._backgroundImage)
-            self.displayImage(self._backgroundImage['url'],
-                              self._backgroundImage['x'],
-                              self._backgroundImage['y'],
-                              True)
-        self._messageDict.pop(key, None)
-        return
+            print(self._background_image)
+            self.display_image(self._background_image['url'],
+                               self._background_image['x'],
+                               self._background_image['y'],
+                               True)
+        self._message_dict.pop(key, None)
 
-    def updateJobDisplay(self):
-        for index, job in enumerate(self._jobDict):
-            xPos = 4
-            yPos = 48 + index * 24
-            jobDescription = job['on_time'] + ' - ' + job['name']
-            infoText = self._font.render(jobDescription, 1, (255, 255, 255))
-            infoRect = infoText.get_rect()
-            jobDuration = '(' + str(job['on_duration']) + 's)'
-            durationText = self._minifont.render(jobDuration, 1, (255, 255, 255))
-            durationRect = durationText.get_rect()
-            jobValve = str(job['valve'])
-            valveText = self._midifont.render(jobValve, 1, (0, 0, 0))
-            valveRect = valveText.get_rect()
-            if job['id'] in self._activeJobs:
-                color = self._CDBLUE
+        return self
+
+    def update_job_display(self):
+        """
+        Manages displaying everything that's in the job and message dictonaries
+        TODO: separate job / message management
+        """
+        for index, job in enumerate(self._job_dict):
+            position = {
+                'x': 4,
+                'y': 48 + index * 24,
+            }
+
+            job_valve = str(job['valve'])
+            job_label = str(job['on_time']) + ' - ' + str(job['name'])
+            job_timer = '(' + str(job['on_duration']) + 's)'
+
+            font = {
+                'valve': self._midifont.render(job_valve, 1, (0, 0, 0)),
+                'job': self._font.render(job_label, 1, (255, 255, 255)),
+                'timer': self._minifont.render(job_timer, 1, (255, 255, 255)),
+            }
+
+            if job['id'] in self._active_jobs:
+                color = self._cdblue
             else:
-                color = (74, 74, 74)
+                color = self._cdactive
+
+            # display valve
+            pygame.draw.rect(self._screen,
+                             self._cdblue,
+                             [0,
+                              position['y'],
+                              font['valve'].get_rect().width+4,
+                              font['valve'].get_rect().height+2])
+
+            self._screen.blit(font['valve'], (2, position['y']+2))
+
+            # display label
             pygame.draw.rect(self._screen,
                              color,
-                             [xPos,
-                              yPos,
+                             [position['x'],
+                              position['y'],
                               312,
-                              infoRect.height-2]) #(48, 48, 48)
+                              font['label'].get_rect().height-2])
+
+            self._screen.blit(font['label'], (position['x'] + font['label'].get_rect().width + 2,
+                                              position['y']))
+
+            # display countdown timer
             pygame.draw.rect(self._screen,
-                             self._CDGREEN,
-                             [312 - durationRect.width + 2,
-                              yPos + 4,
-                              durationRect.width+2,
-                              durationRect.height+2])
-            pygame.draw.rect(self._screen,
-                             self._CDBLUE,
-                             [0,
-                              yPos,
-                              valveRect.width+4,
-                              valveRect.height+2])
-            self._screen.blit(infoText, (xPos+valveRect.width + 2, yPos))
-            self._screen.blit(durationText,
-                              (312 - durationRect.width + 4, yPos+6))
-            self._screen.blit(valveText, (2, yPos+2))
-            # after rendering last job, show any existing messages
-        messageCount = len(self._messageDict)
-        if messageCount > 0:
+                             self._cdgreen,
+                             [312 - font['timer'].get_rect().width + 2,
+                              position['y'] + 4,
+                              font['timer'].get_rect().width+2,
+                              font['timer'].get_rect().height+2])
+
+            self._screen.blit(font['timer'], (312 - font['timer'].get_rect().width + 4,
+                                              position['y']+6))
+
+        # after rendering last job, show any existing messages
+        message_count = len(self._message_dict)
+        if message_count > 0:
             if int(time.time()) % 2 == 0:
-                messageBoxFillColor = self._CDRED
-                messageBoxBorderColor = self._CDBLUE
+                message_box_fill_color = self._cdred
+                message_box_border_color = self._cdblue
             else:
-                messageBoxFillColor = self._CDBLUE
-                messageBoxBorderColor = self._CDRED
+                message_box_fill_color = self._cdblue
+                message_box_border_color = self._cdred
             pygame.draw.rect(self._screen,
-                             messageBoxBorderColor,
+                             message_box_border_color,
                              [46,
                               0,
                               272,
-                              42*messageCount+2],
+                              42*message_count+2],
                              2)
             pygame.draw.rect(self._screen,
-                             messageBoxFillColor,
+                             message_box_fill_color,
                              [48,
                               2,
                               270,
-                              42*messageCount])
-            for message in self._messageDict.values():
-                messageText = self._font.render(message, 1, (0, 0, 0))
-                self._screen.blit(messageText, (62, 42*messageCount-30))
+                              42*message_count])
+            for message in self._message_dict.values():
+                message_text = self._font.render(message, 1, (0, 0, 0))
+                self._screen.blit(message_text, (62, 42*message_count-30))
         pygame.display.flip()
-        return
 
-    def markActiveJob(self, jobId, state):
+        return self
+
+    def mark_active_job(self, job_id, state):
+        """
+        Pushes a job ID into _active_jobs that will be rendered differently
+        """
         if state:
-            self._activeJobs.append(jobId)
+            self._active_jobs.append(job_id)
         else:
-            self._activeJobs.remove(jobId)
-        return
+            self._active_jobs.remove(job_id)
+
+        return self
