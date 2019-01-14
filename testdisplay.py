@@ -10,6 +10,7 @@ from time import sleep
 from display import Display
 
 TFT = Display()
-TFT.displayImage('static/gfx/lcd-skrubba-color.png', x=67, y=10, clearScreen=True)
+TFT.display_image('static/gfx/lcd-skrubba-color.png', pos_x=67, pos_y=10, clear_screen=True)
+
 while True:
     sleep(10)
