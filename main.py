@@ -19,11 +19,9 @@ from apscheduler.schedulers.background import BackgroundScheduler # pylint: disa
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR # pylint: disable=import-error
 from shiftregister import Shiftregister
 from relay import Relay
+from display import Display
 from db import DB
 from environment import RUNNINGONPI, DEBUG
-
-if RUNNINGONPI:
-    from display import Display
 
 # change working directory to directory of this script so that images
 # relative paths can be found
@@ -110,7 +108,6 @@ def restart_job_manager():
 
     for job in SCHEDULER.get_jobs():
         SCHEDULER.remove_job(job.id)
-    if RUNNINGONPI:
         TFT.clear_job_display()
 
     # Add all jobs that are stored in database
@@ -118,8 +115,7 @@ def restart_job_manager():
     valve_configs = store.load_valve_configs()
     for config in valve_configs:
         if config['on_time'] and config['on_duration'] and config['is_active']:
-            if RUNNINGONPI:
-                TFT.display_job(config)
+            TFT.display_job(config)
             time_components = [int(x) for x in config['on_time'].split(':')]
             if config['interval_type'] == 'daily':
                 SCHEDULER.add_job(valve_job,
@@ -155,12 +151,11 @@ def restart_job_manager():
     # print('JOBS:')
     # print(SCHEDULER.get_jobs())
 
-    if RUNNINGONPI:
-        while time.time() - display_time < 5:
-            time.sleep(1)
-        TFT.clear()
-        TFT.set_background_image('static/gfx/lcd-ui-background.png', pos_x=0, pos_y=0)
-        add_tft_job()
+    while time.time() - display_time < 5:
+        time.sleep(1)
+    TFT.clear()
+    TFT.set_background_image('static/gfx/lcd-ui-background.png', pos_x=0, pos_y=0)
+    add_tft_job()
 
     return True
 
@@ -597,11 +592,10 @@ def setup_backend_user_tracking():
         """
         for client_ip in KEEPALIVE_COUNTERS.items():
             KEEPALIVE_COUNTERS[client_ip] -= 10
-            if RUNNINGONPI:
-                if KEEPALIVE_COUNTERS[client_ip] > 0:
-                    TFT.display_message(client_ip + ' is logged in.')
-                else:
-                    TFT.clear_message(client_ip)
+            if KEEPALIVE_COUNTERS[client_ip] > 0:
+                TFT.display_message(client_ip + ' is logged in.')
+            else:
+                TFT.clear_message(client_ip)
     SCHEDULER.add_job(track_active_backend_users, 'interval', seconds=10)
 
 KEEPALIVE_COUNTERS = {}
@@ -624,12 +618,11 @@ if __name__ == "__main__":
     #print args.accumulate(args.local)
     #exit;
     if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        if RUNNINGONPI:
-            TFT = Display()
-            TFT.display_image('static/gfx/lcd-skrubba-color.png',
-                              pos_x=67, pos_y=10, clear_screen=True)
-            # All valves off
-            VALVES = Shiftregister()
+        TFT = Display()
+        TFT.display_image('static/gfx/lcd-skrubba-color.png',
+                          pos_x=67, pos_y=10, clear_screen=True)
+        # All valves off
+        VALVES = Shiftregister()
         if not SCHEDULER.running:
             start_scheduler()
             restart_job_manager()

@@ -9,6 +9,7 @@ by Kana kanabanarama@googlemail.com
 import os
 import time
 import pygame   # pylint: disable=import-error
+import environment
 
 class Display():
     """
@@ -29,8 +30,9 @@ class Display():
     _active_jobs = []
 
     def __init__(self):
-        os.environ['SDL_FBDEV'] = '/dev/fb1'
-        os.environ['SDL_VIDEODRIVER'] = 'fbcon'
+        if environment.RUNNINGONPI:
+            os.environ['SDL_FBDEV'] = '/dev/fb1'
+            os.environ['SDL_VIDEODRIVER'] = 'fbcon'
         pygame.init()
         pygame.mouse.set_visible(0)
         self._font = pygame.font.Font(None, 30)
