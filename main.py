@@ -12,28 +12,35 @@ import atexit
 import logging
 from functools import wraps
 from datetime import datetime
-from flask import Flask, request, send_from_directory, render_template, json
-from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer, BadSignature, SignatureExpired)
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
+from flask import Flask, request, send_from_directory, render_template, json # pylint: disable=import-error
+from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer, # pylint: disable=import-error
+                          BadSignature, SignatureExpired) # pylint: disable=import-error
+from apscheduler.schedulers.background import BackgroundScheduler # pylint: disable=import-error
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR # pylint: disable=import-error
 from shiftregister import Shiftregister
 from relay import Relay
 from db import DB
-from environment import RUNNINGONPI
-
-# change working directory to directory of this script so that images
-# relative paths can be found
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
+from environment import RUNNINGONPI, DEBUG
 
 if RUNNINGONPI:
     from display import Display
 
-app = Flask(__name__, template_folder='templates')
-app.secret_key = os.urandom(32)
-tokenExpiration = 7200
-scheduler = BackgroundScheduler(standalone=True)
+# change working directory to directory of this script so that images
+# relative paths can be found
+ABSPATH = os.path.abspath(__file__)
+DNAME = os.path.dirname(ABSPATH)
+os.chdir(DNAME)
+
+APP = Flask(__name__, template_folder='templates')
+APP.secret_key = os.urandom(32)
+TOKEN_EXPIRATION = 7200
+SCHEDULER = BackgroundScheduler(standalone=True)
+
+# Serve all static files from within template folder
+if DEBUG:
+    from werkzeug import SharedDataMiddleware
+    APP.wsgi_app = SharedDataMiddleware(APP.wsgi_app, {
+        '/': os.path.join(os.path.dirname(__file__), 'templates')})
 
 ################################################################################
 # Scheduler
@@ -42,112 +49,124 @@ scheduler = BackgroundScheduler(standalone=True)
 logging.basicConfig()
 
 DEBUG = True
+DISPLAYACCESS = False
 
-def valveJob(setting): #(valve, onDuration)
+def valve_job(valve_setting): #(valve, onDuration)
+    """
+    Open a valve specified with settings
+    """
     print('OPENING VALVE')
-    tft.markActiveJob(setting['id'], True)
-    durationLeft = int(setting['on_duration']) + 2
-    #binaryValveList = map(int, list(format(setting['valve'], '08b')))
+    tft.markActiveJob(valve_setting['id'], True)
+    duration_left = int(valve_setting['on_duration']) + 2
+    #binaryValveList = map(int, list(format(valve_setting['valve'], '08b')))
     #print binaryValveList
     pump = Relay()
-    pump.on()
+    pump.switch_on()
     time.sleep(1)
     #valves = Shiftregister()
     #shiftreg.outputList(binaryValveList)
-    valves.outputDecimal(setting['valve'])
+    valves.output_decimal(valve_setting['valve'])
     #valves.enable()
-    while durationLeft > 2:
+    while duration_left > 2:
         time.sleep(1)
-        durationLeft -= 1
-        print('TIME LEFT: %i' % (durationLeft - 1))
+        duration_left -= 1
+        print('TIME LEFT: %i' % (duration_left - 1))
     print('CLOSING VALVE')
-    pump.off()
+    pump.switch_off()
     print('reset shift register 1')
     #valves.disable()
     valves.reset()
     time.sleep(1)
 
     #valves.reset()
-    tft.markActiveJob(setting['id'], False)
-    db = DB()
-    db.addLogLine(setting, datetime.now())
-    return
+    tft.markActiveJob(valve_setting['id'], False)
+    store = DB()
+    store.addLogLine(valve_setting, datetime.now())
 
-def startScheduler():
-    # start scheduler if not already running (debug mode has 2 threads, so we
-    # have to make sure it only starts once)
-    scheduler.start()
-    scheduler.add_listener(schedulerJobEventListener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+    return True
+
+def start_scheduler():
+    """
+    start scheduler if not already running (debug mode has 2 threads, so we
+    have to make sure it only starts once)
+    """
+    SCHEDULER.start()
+    SCHEDULER.add_listener(scheduler_job_event_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
     atexit.register(unloadScheduler)
-    return
 
-def schedulerJobEventListener(event):
+    return True
+
+def scheduler_job_event_listener(event):
+    """
+    Event listener for scheduler, do emergency stuff when something goes wrong
+    """
     if event.exception:
         print('The scheduler job crashed.')
     #else:
     #    print('The scheduler job finished successfully.')
 
-def restartJobManager():
-    # Remove all jobs
-    if len(scheduler.get_jobs()) > 0:
-        for job in scheduler.get_jobs():
-            scheduler.remove_job(job.id)
-        if RUNNINGONPI:
-            tft.clearJobDisplay()
+def restart_job_manager():
+    """
+    Remove all jobs
+    """
+    for job in SCHEDULER.get_jobs():
+        SCHEDULER.remove_job(job.id)
+    if RUNNINGONPI:
+        tft.clearJobDisplay()
 
     # Add all jobs that are stored in database
-    db = DB()
-    valveConfigs = db.loadValveConfigs()
-    for config in valveConfigs:
+    store = DB()
+    valve_configs = store.loadValveConfigs()
+    for config in valve_configs:
         if config['on_time'] and config['on_duration'] and config['is_active']:
             if RUNNINGONPI:
                 tft.displayJob(config)
-            timeComponents = [int(x) for x in config['on_time'].split(':')]
+            time_components = [int(x) for x in config['on_time'].split(':')]
             if config['interval_type'] == 'daily':
-                scheduler.add_job(valveJob,
+                SCHEDULER.add_job(valve_job,
                                   'cron',
                                   day_of_week='mon-sun',
-                                  hour=timeComponents[0],
-                                  minute=timeComponents[1],
-                                  second=timeComponents[2],
+                                  hour=time_components[0],
+                                  minute=time_components[1],
+                                  second=time_components[2],
                                   args=[config])
                 #print('Scheduled daily job [%i:%i]'
-                #      % (timeComponents[0], timeComponents[1]))
+                #      % (time_components[0], time_components[1]))
             if config['interval_type'] == 'weekly':
-                scheduler.add_job(valveJob,
+                SCHEDULER.add_job(valve_job,
                                   'cron',
                                   day_of_week='sun',
-                                  hour=timeComponents[0],
-                                  minute=timeComponents[1],
-                                  second=timeComponents[2],
+                                  hour=time_components[0],
+                                  minute=time_components[1],
+                                  second=time_components[2],
                                   args=[config])
                 #print('Scheduled weekly job [sun %i:%i]'
-                #      % (timeComponents[0], timeComponents[1]))
+                #      % (time_components[0], time_components[1]))
             if config['interval_type'] == 'monthly':
-                scheduler.add_job(valveJob,
+                SCHEDULER.add_job(valve_job,
                                   'cron',
                                   day=1,
-                                  hour=timeComponents[0],
-                                  minute=timeComponents[1],
-                                  second=timeComponents[2],
+                                  hour=time_components[0],
+                                  minute=time_components[1],
+                                  second=time_components[2],
                                   args=[config])
                 #print('Scheduled monthly job [1st of the month %i:%i]'
-                #      % (timeComponents[0], timeComponents[1]))
+                #      % (time_components[0], time_components[1]))
 
-    # print 'JOBS:'
-    # print scheduler.get_jobs()
+    # print('JOBS:')
+    # print(SCHEDULER.get_jobs())
 
     if RUNNINGONPI:
         while time.time() - displayTime < 5:
             time.sleep(1)
         tft.clear()
         tft.setBackgroundImage('static/gfx/lcd-ui-background.png', x=0, y=0)
-        addTftJob()
+        add_tft_job()
 
-    return
+    return True
 
-def addTftJob():
-    def tftJob():
+def add_tft_job():
+    def tft_job():
         #if(os.getenv('SSH_CLIENT')):
         #    os.environ.get('SSH_CLIENT')
         #    os.environ['SSH_CLIENT'] // nothing ?
@@ -159,8 +178,9 @@ def addTftJob():
         tft.displayText(time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46))
         tft.updateJobDisplay()
         return
-    scheduler.add_job(tftJob, 'interval', seconds=1)
-    return
+    SCHEDULER.add_job(tft_job, 'interval', seconds=1)
+
+    return True
 
 ################################################################################
 # Authentication
@@ -169,47 +189,49 @@ def addTftJob():
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not isLoginRequired():
+        if not is_login_required():
             return f(*args, **kwargs)
         else:
             headerAuthToken = request.headers.get('authentication')
-            print('authToken: %s / Token validation result: %i'
-                  % (headerAuthToken, checkAuthToken(headerAuthToken)))
-            if not headerAuthToken or not checkAuthToken(headerAuthToken):
+            if not headerAuthToken or not check_auth_token(headerAuthToken):
                 print('return denyAccess()')
-                return denyAccessToken()
+                return deny_access_token()
             print('return f()')
             return f(*args, **kwargs)
+
     return decorated
 
-def isLoginRequired():
-    db = DB()
+def is_login_required():
+    store = DB()
     loginRequired = False
-    for line in db.loadSystemSettings():
+    for line in store.loadSystemSettings():
         if line['setting_name'] == 'username':
             loginRequired = True
             break
+
     return loginRequired
 
-def generateAuthToken(self, credentials, expiration=tokenExpiration):
-    s = Serializer(app.config['SECRET_KEY'], expires_in=expiration)
+def generate_auth_token(self, credentials, expiration=TOKEN_EXPIRATION):
+    s = Serializer(APP.config['SECRET_KEY'], expires_in=expiration)
     print("'username': credentials['username']")
+
     return s.dumps({'username': credentials['username']})
 
-def checkAuthToken(authToken):
-    s = Serializer(app.config['SECRET_KEY'])
+def check_auth_token(authToken):
+    s = Serializer(APP.config['SECRET_KEY'])
     try:
         data = s.loads(authToken)
     except SignatureExpired:
         return False # valid token, but expired
     except BadSignature:
         return False # invalid token
+
     return True
 
-def denyAccessToken():
+def deny_access_token():
     return json.dumps({'success': 'false', 'message': 'Authentication failed.'})
 
-@app.route("/action/login", methods=['GET', 'POST'])
+@APP.route("/action/login", methods=['GET', 'POST'])
 def actionLogin():
     if request.method == 'POST':
         params = request.get_json()
@@ -217,8 +239,8 @@ def actionLogin():
         requestPassword = params['password']
 
         systemCredentials = {}
-        db = DB()
-        for line in db.loadSystemSettings():
+        store = DB()
+        for line in store.loadSystemSettings():
             if line['setting_name'] == 'username':
                 systemCredentials['username'] = line['setting_value']
             if line['setting_name'] == 'password':
@@ -231,11 +253,12 @@ def actionLogin():
                 and requestUsername == systemCredentials['username'] \
                 and requestPassword == systemCredentials['password']:
             print('Login successful')
-            token = generateAuthToken(request, systemCredentials, 600)
+            token = generate_auth_token(request, systemCredentials, 600)
             response = json.dumps({'success': 'true', 'token': token})
         else:
             print('Login failed')
             response = json.dumps({'success': 'false', 'message': 'Invalid login.'})
+
     return response
 
 def localhost_only(f):
@@ -250,12 +273,12 @@ def localhost_only(f):
         print('allowed: %i' % allowed)
         if not allowed:
             print('return denyIp()' + requestIp)
-            return denyRequestIp()
-        #print 'return f()'
+            return deny_request_ip()
+        #print('return f()')
         return f(*args, **kwargs)
     return decorated
 
-def denyRequestIp():
+def deny_request_ip():
     return json.dumps({'success': 'false',
                        'message': 'Requests from remote hosts are not allowed.'
                       })
@@ -264,47 +287,48 @@ def denyRequestIp():
 # Flask CRUD routes
 ################################################################################
 
-@app.route("/data/plant.json", methods=['GET', 'POST'])
+@APP.route("/data/plant.json", methods=['GET', 'POST'])
 @requires_auth
 @localhost_only
 def plant():
-    db = DB()
+    store = DB()
     action = request.args.get('action')
 
     if action == 'read':
-        valveConfigs = db.loadValveConfigs()
-        # print 'READ VALVE CONFIG:'
-        # print valveConfigs
+        valveConfigs = store.loadValveConfigs()
+        # print('READ VALVE CONFIG:')
+        # print(valveConfigs)
         response = json.dumps({'plant': valveConfigs})
 
     elif action == 'create':
         jsonValveConfigs = request.form['plant']
         valveConfig = json.loads(jsonValveConfigs)
         # check if valves can be added (system_settings.valve_amount)
-        maxValves = db.getMaxValveCountSetting()
-        actualValves = db.getValveCount()
+        maxValves = store.getMaxValveCountSetting()
+        actualValves = store.getValveCount()
         if not maxValves or actualValves < maxValves:
-            # print 'CREATED VALVE CONFIG:'
+            # print('CREATED VALVE CONFIG:')
             # print valveConfig
-            newRow = db.addValveConfig(valveConfig)
+            newRow = store.addValveConfig(valveConfig)
             if len(newRow):
-                restartJobManager()
+                restart_job_manager()
                 responseObj = {'success': 'true', 'plant': newRow}
             else:
                 responseObj = {'success': 'false'}
         else:
             responseObj = {'success': 'false',
-                           'message': 'No more entrys to add, maximum entries can be configured in settings.'}
+                           'message': 'No more entrys to add, maximum entries '\
+                           'can be configured in settings.'}
         response = json.dumps(responseObj)
 
     elif action == 'update':
         jsonValveConfigs = request.form['plant']
         valveConfig = json.loads(jsonValveConfigs)
-        # print 'UPDATED VALVE CONFIG:'
-        # print valveConfig
-        success = db.saveValveConfig(valveConfig)
-        if success == True:
-            restartJobManager()
+        # print('UPDATED VALVE CONFIG:')
+        # print(valveConfig)
+        success = store.saveValveConfig(valveConfig)
+        if success:
+            restart_job_manager()
             responseObj = {'success': 'true'}
         else:
             responseObj = {'success': 'false',
@@ -316,37 +340,38 @@ def plant():
     elif action == 'destroy':
         jsonValveConfigs = request.form['plant']
         valveConfig = json.loads(jsonValveConfigs)
-        # print 'DELETED VALVE CONFIG:'
+        # print('DELETED VALVE CONFIG:')
         # print valveConfig
-        success = db.deleteValveConfig(valveConfig['id'])
-        restartJobManager()
+        success = store.deleteValveConfig(valveConfig['id'])
+        restart_job_manager()
         response = json.dumps({'success': str(success).lower()})
 
     return response
 
-@app.route("/data/log.json", methods=['GET', 'POST'])
+@APP.route("/data/log.json", methods=['GET', 'POST'])
 @requires_auth
 @localhost_only
 def log():
-    db = DB()
+    store = DB()
     action = request.args.get('action')
     if action == 'read':
-        logs = db.loadLogs()
-        # print 'READ LOGS:'
-        # print logs
+        logs = store.loadLogs()
+        # print('READ LOGS:')
+        # print(logs)
         response = json.dumps({'log': logs})
+
     return response
 
-@app.route("/data/setting.json", methods=['GET', 'POST'])
+@APP.route("/data/setting.json", methods=['GET', 'POST'])
 #@requires_auth
 @localhost_only
 def setting():
-    db = DB()
+    store = DB()
     action = request.args.get('action')
     if action == 'read':
         settings = {}
-        # print 'READ SYSTEM CONF:'
-        for line in db.loadSystemSettings():
+        # print('READ SYSTEM CONF:')
+        for line in store.loadSystemSettings():
             if line['setting_name'] == 'password':
                 continue
             settings.update({line['setting_name']: line['setting_value']})
@@ -359,39 +384,42 @@ def setting():
             response = json.dumps({'success': 'false'})
             if 'username' in params:
                 credentialUsername = params['username']
-                db.updateSystemSettings('username', credentialUsername)
+                store.updateSystemSettings('username', credentialUsername)
                 response = json.dumps({'success': 'true'})
             if 'password' in params:
                 credentialPassword = params['password']
-                db.updateSystemSettings('password', credentialPassword)
+                store.updateSystemSettings('password', credentialPassword)
                 response = json.dumps({'success': 'true'})
             if 'valve_amount' in params:
                 valveAmount = int(params['valve_amount'])
-                actualValves = db.getValveCount()
+                actualValves = store.getValveCount()
                 if actualValves <= valveAmount:
-                    db.updateSystemSettings('valve_amount', valveAmount)
+                    store.updateSystemSettings('valve_amount', valveAmount)
                     response = json.dumps({'success': 'true'})
                 else:
                     response = json.dumps({'success': 'false',
-                                           'message': 'There are more valves set up than you want to allow. Please remove some of them first.'})
+                                           'message': 'There are more valves '\
+                                           'set up than you want to allow.'\
+                                           'Please remove some of them first.'})
     elif action == 'destroy':
         if request.method == 'POST':
             jsonCredentials = request.form['setting']
             params = json.loads(jsonCredentials)
-            # print params
+            #print(params)
             #for setting in params:
             for key, value in params.items():
-                # print 'checking: %s / %s' % (key, value)
+                #print('checking: %s / %s' % (key, value))
                 if value == '-DELETE-':
-                    db.deleteSystemSetting(key)
+                    store.deleteSystemSetting(key)
             response = json.dumps({'success': 'true'})
+
     return response
 
 ################################################################################
 # Flask action routes
 ################################################################################
 
-@app.route("/action/manualwatering", methods=['GET', 'POST'])
+@APP.route("/action/manualwatering", methods=['GET', 'POST'])
 @requires_auth
 @localhost_only
 def actionManualwatering():
@@ -403,10 +431,11 @@ def actionManualwatering():
         valves.outputBinary(valveNo)
         print("OPENED VALVE %i" % valveNo)
     response = json.dumps({'success': 'true'})
+
     return response
 
 
-@app.route('/action/serveroff', methods=['POST'])
+@APP.route('/action/serveroff', methods=['POST'])
 @requires_auth
 @localhost_only
 def serveroff():
@@ -416,7 +445,7 @@ def serveroff():
     unloadFlask()
     return json.dumps({'success': 'true'})
 
-@app.route('/action/reboot', methods=['POST'])
+@APP.route('/action/reboot', methods=['POST'])
 @requires_auth
 @localhost_only
 def reboot():
@@ -425,9 +454,10 @@ def reboot():
     #unloadScheduler()
     unloadFlask()
     os.system("reboot")
+
     return json.dumps({'success': 'true'})
 
-@app.route('/action/shutdown', methods=['POST'])
+@APP.route('/action/shutdown', methods=['POST'])
 @requires_auth
 @localhost_only
 def shutdown():
@@ -436,6 +466,7 @@ def shutdown():
     #unloadScheduler()
     unloadFlask()
     os.system("poweroff")
+
     return json.dumps({'success': 'true'})
 
 ################################################################################
@@ -444,8 +475,9 @@ def shutdown():
 
 def unloadScheduler():
     print('Shutting down scheduler...')
-    scheduler.shutdown()
-    return
+    SCHEDULER.shutdown()
+
+    return True
 
 def unloadFlask():
     func = request.environ.get('werkzeug.server.shutdown')
@@ -453,51 +485,45 @@ def unloadFlask():
         raise RuntimeError('Not running with the Werkzeug Server')
     print('Shutting down flask...')
     func()
-    return
+
+    return True
 
 '''def postServerOffRequest():
-    response = app.test_client().post('/serveroff')
+    response = APP.test_client().post('/serveroff')
     return response'''
 
 ################################################################################
 # Flask main
 ################################################################################
 
-# Serve all static files from within template folder
-if DEBUG:
-    from werkzeug import SharedDataMiddleware
-
-    app.wsgi_app = SharedDataMiddleware(app.wsgi_app,
-                                        {'/': os.path.join(os.path.dirname(__file__), 'templates')})
-
 # Serve favicon from static folder
-@app.route('/favicon.ico')
+@APP.route('/favicon.ico')
 def favicon():
-    faviconPath = os.path.join(app.root_path, 'static')
+    faviconPath = os.path.join(APP.root_path, 'static')
     return send_from_directory(faviconPath, 'gfx/favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 # Serve index page
-@app.route("/", methods=['GET', 'POST'])
+@APP.route("/", methods=['GET', 'POST'])
 def index():
-    #print "user /"
+    #print("user /")
     return render_template('index.html')
 
 def setupKeepaliveTracking():
     def trackBackendUserActivity():
         for ip, counter in keepaliveCounters.items():
             keepaliveCounters[ip] -= 10
-            if RUNNINGONPI:
+            if RUNNINGONPI and DISPLAYACCESS:
                 if keepaliveCounters[ip] > 0:
                     tft.displayMessage(ip, ip + ' is logged in.')
                 else:
                     tft.clearMessage(ip)
-    scheduler.add_job(trackBackendUserActivity, 'interval', seconds=10)
+    SCHEDULER.add_job(trackBackendUserActivity, 'interval', seconds=10)
     return
 
 keepaliveCounters = {}
 
-#@app.before_request
-@app.route("/keepalive", methods=['GET'])
+#@APP.before_request
+@APP.route("/keepalive", methods=['GET'])
 def refreshKeepalive():
     keepaliveCounters[request.remote_addr] = 11
     return json.dumps({'success': 'true'})
@@ -508,7 +534,7 @@ if __name__ == "__main__":
     #parser = argparse.ArgumentParser(description = 'Let program simulate on local machine.')
     #parser.add_argument('local')
     #args = parser.parse_args()
-    #print(args.accumulate(args.local))
+    #print args.accumulate(args.local)
     #exit;
     if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         if RUNNINGONPI:
@@ -517,8 +543,8 @@ if __name__ == "__main__":
             displayTime = time.time()
             # All valves off
             valves = Shiftregister()
-        if not scheduler.running:
-            startScheduler()
-            restartJobManager()
+        if not SCHEDULER.running:
+            start_scheduler()
+            restart_job_manager()
             setupKeepaliveTracking()
-    app.run(host='0.0.0.0', port=80 if RUNNINGONPI else 2525, debug=DEBUG)
+    APP.run(host='0.0.0.0', port=80 if RUNNINGONPI else 2525, debug=DEBUG)

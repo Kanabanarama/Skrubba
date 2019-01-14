@@ -6,6 +6,7 @@ File shiftregister.py
 by Kana kanabanarama@googlemail.com
 """
 
+import time
 from environment import RUNNINGONPI
 
 if RUNNINGONPI:
@@ -41,58 +42,85 @@ class Shiftregister(object):
         return
 
     def enable(self):
+        """
+        Enables GPIO output mode for shift register
+        """
         GPIO.output(self._OE, 0)
         return
 
     def disable(self):
+        """
+        Disables GPIO output mode for shift register
+        """
         GPIO.output(self._OE, 1)
         return
 
-    def __pulseClock(self):
+    def _pulse_clock(self):
+        """
+        Used internally to pulse clock pin
+        """
         GPIO.output(self._CLOCK, 1)
         GPIO.output(self._CLOCK, 0)
         return
 
-    def __pulseLatch(self):
+    def _pulse_latch(self):
+        """
+        Used internally to pulse the latch pin
+        """
         GPIO.output(self._LATCH, 1)
         GPIO.output(self._LATCH, 0)
         return
 
     def reset(self):
+        """
+        Resets the shift register
+        """
         for _ in range(0, 8):
             GPIO.output(self._DATA, 1)
-            self.__pulseClock()
-        self.__pulseLatch()
+            self._pulse_clock()
+        self._pulse_latch()
         return
 
-    def outputDecimal(self, decimalValue):
-        binaryValue = 2**(int(decimalValue)-1)
-        self.outputBinary(binaryValue)
+    def output_decimal(self, decimal_value):
+        """
+        Outputs HIGH to the pin numbered decimal
+        """
+        binary_value = 2**(int(decimal_value)-1)
+        self.output_binary(binary_value)
         return
 
-    def outputBinary(self, binaryValue):
+    def output_binary(self, binary_value):
+        """
+        Outputs high to the pin numbered binary
+        """
         bits = [True for i in range(8)]
         for i in range(8):
-            bits[7-i] = False if binaryValue & 1 else True
+            bits[7-i] = False if binary_value & 1 else True
             GPIO.output(self._DATA, bits[7-i])
-            self.__pulseClock()
-            binaryValue = binaryValue >> 1
-        self.__pulseLatch()
+            self._pulse_clock()
+            binary_value = binary_value >> 1
+        self._pulse_latch()
         return
 
-    def outputList(self, valueList):
-        binaryValue = 0
+    def output_list(self, value_list):
+        """
+        Output high to all pins that an array of 8 items has true values
+        """
+        binary_value = 0
         for i in range(0, 8):
-            if valueList[i] == 1:
-                valueList = binaryValue | 2**i
-        self.outputBinary(binaryValue)
+            if value_list[i] == 1:
+                value_list = binary_value | 2**i
+        self.output_binary(binary_value)
         return
 
-    def testLoop(self):
+    def test_loop(self):
+        """
+        Checks all 8 outputs by setting them to HIGH
+        """
         while 1:
-            bitValue = 1
+            bit_value = 1
             for _ in range(0, 8):
-                outputBinary(bitValue)
-                bitValue = bitValue << 1
+                self.output_binary(bit_value)
+                bit_value = bit_value << 1
                 time.sleep(2)
         return

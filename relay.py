@@ -6,14 +6,14 @@ Use defined data pin
 by Kana kanabanarama@googlemail.com
 """
 
-from environment import RUNNINGONPI
+import environment
 
-if RUNNINGONPI:
-    import RPi.GPIO as GPIO
+if environment.RUNNINGONPI:
+    import RPi.GPIO         # pylint: disable=import-error,unused-import
 else:
-    import FakeRPi as GPIO
+    import FakeRPi as GPIO  # pylint: disable=import-error
 
-class Relay(object):
+class Relay():
     """
     Controls a single relay
     """
@@ -24,17 +24,19 @@ class Relay(object):
         GPIO.setmode(GPIO.BCM)
         self.data = pin
         GPIO.setup(self.data, GPIO.OUT)
-        self.off()
-        return
+        #self.switch_off()
 
     def __del__(self):
-        #GPIO.cleanup()
-        return
+        return #GPIO.cleanup()
 
-    def on(self):
-        GPIO.output(self.data, 0)
-        return
+    def switch_on(self):
+        """
+        Turn on relay
+        """
+        return GPIO.output(self.data, 0)
 
-    def off(self):
-        GPIO.output(self.data, 1)
-        return
+    def switch_off(self):
+        """
+        Turn off relay
+        """
+        return GPIO.output(self.data, 1)

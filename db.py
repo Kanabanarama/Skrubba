@@ -56,7 +56,7 @@ class DB(object):
 
     def updateSystemSettings(self, settingName, settingValue):
         # print 'UPDATE SYSTEM SETTINGS: %s = %s' % (settingName, settingValue)
-        sql = ('INSERT OR REPLACE INTO system_settings (setting_name, '
+        sql = ('INSERT OR REPLACE INTO system_settings (setting_name, ' \
                'setting_value) VALUES ((?), (?));')
         success = self._cursor.execute(sql, (settingName, settingValue))
         self._connection.commit()
@@ -95,7 +95,7 @@ class DB(object):
         return valveMaxCount
 
     def addValveConfig(self, config):
-        sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN '
+        sql = 'SELECT (s1.valve+1) as unused FROM valve_configs s1 LEFT JOIN ' \
         'valve_configs s2 ON s1.valve = s2.valve -1 WHERE s2.valve IS NULL;'
         self._cursor.execute(sql)
         nextUnusedValve = self._cursor.fetchone()
@@ -104,7 +104,7 @@ class DB(object):
             nextUnusedValve = nextUnusedValve[0]
         else:
             nextUnusedValve = 1
-        sql = ('INSERT INTO valve_configs(valve, name, on_time, on_duration, '
+        sql = ('INSERT INTO valve_configs(valve, name, on_time, on_duration, ' \
                'interval_type) VALUES((?), (?), (?), (?), (?));')
         success = self._cursor.execute(sql, (
             nextUnusedValve,
@@ -118,8 +118,8 @@ class DB(object):
 
     def saveValveConfig(self, config): #id, valve, name, onTime, onDuration, intervalType, isActive
         try:
-            sql = ('UPDATE valve_configs set valve = (?), name = (?), on_time = '
-                   '(?), on_duration = (?), interval_type = (?), is_active = (?) '
+            sql = ('UPDATE valve_configs set valve = (?), name = (?), on_time = ' \
+                   '(?), on_duration = (?), interval_type = (?), is_active = (?) ' \
                    'WHERE id = (?);')
             success = self._cursor.execute(sql, (
                 config['valve'],
@@ -153,8 +153,8 @@ class DB(object):
         # print 'ADDING LOG LINE:'
         # print data
         # print logDate
-        sql = ('INSERT INTO valve_logs(valve_config_id, valve, on_time, '
-               'on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), '
+        sql = ('INSERT INTO valve_logs(valve_config_id, valve, on_time, ' \
+               'on_duration, interval_type, last_on_date) VALUES((?), (?), (?), (?), ' \
                '(?), (?));')
         success = self._cursor.execute(sql, (
             data['id'],
