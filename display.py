@@ -7,6 +7,8 @@ by Kana kanabanarama@googlemail.com
 """
 
 import os
+import sys
+import signal
 import time
 import pygame   # pylint: disable=import-error
 import environment
@@ -34,6 +36,11 @@ class Display():
             os.environ['SDL_FBDEV'] = '/dev/fb1'
             os.environ['SDL_VIDEODRIVER'] = 'fbcon'
         pygame.init()
+
+        # fbcon sometimes not freed when app crashes
+        signal.signal(signal.SIGTERM, self.signal_handler)
+        signal.signal(signal.SIGINT, self.signal_handler)
+        
         pygame.mouse.set_visible(0)
         self._font = pygame.font.Font(None, 30)
         self._minifont = pygame.font.Font(None, 15)
@@ -44,9 +51,16 @@ class Display():
         """
         Cleanup
         """
-        # cleanup
+        print('Pygame cleanup')
+        pygame.quit()
 
         return True
+
+    def signal_handler(signal, frame):
+      print('Signal: {}'.format(signal))
+      time.sleep(1)
+      pygame.quit()
+      sys.exit(0)
 
     def clear(self):
         """
@@ -84,19 +98,18 @@ class Display():
 
         return self
 
-    def display_text(self, text):
+    def display_text(self, text, size, pos_x, pos_y, color, bgcolor):
         """
         Displays text at position x/y
         """
-        font = pygame.font.Font(None, text.size)
-        text = font.render(text.content, 1, text.color)
+        font = pygame.font.Font(None, size)
+        text = font.render(text, 1, color)
         rect = text.get_rect()
-        pygame.draw.rect(self._screen, text.bg_color,
-                         [text.pos_x, text.pos_y, rect.width, rect.height])
-        self._screen.blit(text, (text.pos_x, text.pos_y))
+        pygame.draw.rect(self._screen, bgcolor, [pos_x, pos_y, rect.width, rect.height])
+        self._screen.blit(text, (pos_x, pos_y))
         #pygame.display.flip()
 
-        return self
+        return
 
     def clear_job_display(self):
         """
@@ -159,7 +172,7 @@ class Display():
 
             font = {
                 'valve': self._midifont.render(job_valve, 1, (0, 0, 0)),
-                'job': self._font.render(job_label, 1, (255, 255, 255)),
+                'label': self._font.render(job_label, 1, (255, 255, 255)),
                 'timer': self._minifont.render(job_timer, 1, (255, 255, 255)),
             }
 
@@ -168,7 +181,18 @@ class Display():
             else:
                 color = self._cdactive
 
-            # display valve
+            # bar
+            pygame.draw.rect(self._screen,
+                             color,
+                             [position['x'],
+                              position['y'],
+                              312,
+                              font['label'].get_rect().height-2])
+
+            # display label text
+            self._screen.blit(font['label'], (position['x'] + font['valve'].get_rect().width + 2,
+                                              position['y']))
+            # display box with valve
             pygame.draw.rect(self._screen,
                              self._cdblue,
                              [0,
@@ -178,18 +202,7 @@ class Display():
 
             self._screen.blit(font['valve'], (2, position['y']+2))
 
-            # display label
-            pygame.draw.rect(self._screen,
-                             color,
-                             [position['x'],
-                              position['y'],
-                              312,
-                              font['label'].get_rect().height-2])
-
-            self._screen.blit(font['label'], (position['x'] + font['label'].get_rect().width + 2,
-                                              position['y']))
-
-            # display countdown timer
+            # display box with countdown timer
             pygame.draw.rect(self._screen,
                              self._cdgreen,
                              [312 - font['timer'].get_rect().width + 2,
