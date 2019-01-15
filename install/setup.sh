@@ -1,5 +1,14 @@
 #!/bin/sh
 
+# create virtualenv
+echo "Setting up python3 virtual environment"
+python3 -m venv /home/pi/skrubba/.venv
+. .venv/bin/activate
+
+# pip packages
+echo "Installing required python3 packages"
+pip3 install -r /home/pi/skrubba/requirements.txt
+
 # supervisor conf
 echo "Setting up supervisor"
 sudo cp /home/pi/skrubba/install/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
