@@ -40,7 +40,7 @@ class Display():
         # fbcon sometimes not freed when app crashes
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
-        
+
         pygame.mouse.set_visible(0)
         self._font = pygame.font.Font(None, 30)
         self._minifont = pygame.font.Font(None, 15)
@@ -129,13 +129,14 @@ class Display():
 
     _message_dict = {}
 
-    def display_message(self, message):
+    def display_message(self, message, key=False):
         """
         Adds a message
         """
-        #self._message_dict.update({key, message})
-        #self._message_dict[key] = message
-        self._message_dict[len(self._message_dict)+1] = message
+        if(key is not False):
+            self._message_dict[key] = message
+        else:
+            self._message_dict[len(self._message_dict)+1] = message
 
         return self
 

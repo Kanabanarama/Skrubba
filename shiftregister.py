@@ -10,7 +10,7 @@ import time
 import environment
 
 if environment.RUNNINGONPI:
-    import RPi.GPIO         # pylint: disable=import-error,unused-import
+    import RPi.GPIO as GPIO # pylint: disable=import-error,unused-import
 else:
     import FakeRPi as GPIO  # pylint: disable=import-error
 
@@ -37,7 +37,7 @@ class Shiftregister():
         self.enable()
 
     def __del__(self):
-        return GPIO.cleanup()
+        return #GPIO.cleanup()
 
     def enable(self):
         """

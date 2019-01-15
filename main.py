@@ -173,7 +173,7 @@ def add_tft_job():
         #                              (249, 116, 75),
         #                              (0, 110, 46))
         # text, size, pos_x, pos_y, color, bg_color
-        TFT.display_text({time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46)})
+        TFT.display_text(time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46))
         TFT.update_job_display()
 
     SCHEDULER.add_job(tft_job, 'interval', seconds=1)
@@ -334,7 +334,10 @@ def plant():
         if not max_valves or actual_valves < max_valves:
             # print('CREATED VALVE CONFIG:')
             # print(valve_configs)
-            new_entry = store.add_valve_config(valve_configs)
+            try:
+                new_entry = store.add_valve_config(valve_configs)
+            except:
+                print('Error adding config')
             if new_entry:
                 restart_job_manager()
                 response_obj = {'success': 'true', 'plant': new_entry}
@@ -590,12 +593,12 @@ def setup_backend_user_tracking():
         """
         Use keepalive info holding the client IP's
         """
-        for client_ip in KEEPALIVE_COUNTERS.items():
+        for client_ip, counter in KEEPALIVE_COUNTERS.items():
             KEEPALIVE_COUNTERS[client_ip] -= 10
             if KEEPALIVE_COUNTERS[client_ip] > 0:
-                TFT.display_message(client_ip + ' is logged in.')
+                TFT.display_message(client_ip + ' is logged in.', 'backend_user')
             else:
-                TFT.clear_message(client_ip)
+                TFT.clear_message('backend_user')
     SCHEDULER.add_job(track_active_backend_users, 'interval', seconds=10)
 
 KEEPALIVE_COUNTERS = {}
@@ -627,4 +630,7 @@ if __name__ == "__main__":
             start_scheduler()
             restart_job_manager()
             setup_backend_user_tracking()
-    APP.run(host='0.0.0.0', port=80 if RUNNINGONPI else 2525, debug=DEBUG)
+
+    PORT = 8000 if RUNNINGONPI else 2525
+    print('STARTING APP ON PORT %i WITH DEBUG %i' % (PORT, DEBUG,))
+    APP.run(host='0.0.0.0', port=PORT, debug=DEBUG)
