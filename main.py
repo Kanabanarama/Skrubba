@@ -8,20 +8,19 @@ by Kana kanabanarama@googlemail.com
 
 import os
 import time
-import atexit
-import logging
 from functools import wraps
 from datetime import datetime
 from flask import Flask, request, send_from_directory, render_template, json # pylint: disable=import-error
 from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer, # pylint: disable=import-error
                           BadSignature, SignatureExpired) # pylint: disable=import-error
-from apscheduler.schedulers.background import BackgroundScheduler # pylint: disable=import-error
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR # pylint: disable=import-error
-from shiftregister import Shiftregister
-from relay import Relay
-from display import Display
-from db import DB
-from environment import RUNNINGONPI, DEBUG
+
+from skrubba.scheduler import Scheduler
+from skrubba.shiftregister import Shiftregister
+from skrubba.relay import Relay
+from skrubba.display import Display
+from skrubba.db import DB
+
+from config.environment import RUNNINGONPI, DEBUG
 
 # change working directory to directory of this script so that images
 # relative paths can be found
@@ -32,147 +31,12 @@ os.chdir(DNAME)
 APP = Flask(__name__, template_folder='templates')
 APP.secret_key = os.urandom(32)
 TOKEN_EXPIRATION = 7200
-SCHEDULER = BackgroundScheduler(standalone=True)
 
 # Serve all static files from within template folder
 #if DEBUG:
 from werkzeug import SharedDataMiddleware
 APP.wsgi_app = SharedDataMiddleware(APP.wsgi_app, {
     '/': os.path.join(os.path.dirname(__file__), 'templates')})
-
-################################################################################
-# Scheduler
-################################################################################
-
-logging.basicConfig()
-
-def valve_job(valve_setting): #(valve, onDuration)
-    """
-    Open a valve specified with settings
-    """
-    TFT.mark_active_job(valve_setting['id'], True)
-    duration_left = int(valve_setting['on_duration']) + 2
-    #binaryValveList = map(int, list(format(valve_setting['valve'], '08b')))
-    pump = Relay()
-    pump.switch_on()
-    time.sleep(1)
-    #VALVES = Shiftregister()
-    #shiftreg.output_list(binaryValveList)
-    VALVES.output_decimal(valve_setting['valve'])
-    VALVES.enable()
-    while duration_left > 2:
-        time.sleep(1)
-        duration_left -= 1
-    pump.switch_off()
-    VALVES.disable()
-    VALVES.reset()
-    time.sleep(1)
-
-    TFT.mark_active_job(valve_setting['id'], False)
-    store = DB()
-    store.add_log_line(valve_setting, datetime.now())
-
-    return True
-
-def start_scheduler():
-    """
-    start scheduler if not already running (debug mode has 2 threads, so we
-    have to make sure it only starts once)
-    """
-    SCHEDULER.start()
-    SCHEDULER.add_listener(scheduler_job_event_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
-    atexit.register(unload_scheduler)
-
-    return True
-
-def scheduler_job_event_listener(event):
-    """
-    Event listener for scheduler, do emergency stuff when something goes wrong
-    """
-    if event.exception:
-        print('The scheduler job crashed.')
-    #else:
-    #    print('The scheduler job finished successfully.')
-
-def restart_job_manager():
-    """
-    Remove all jobs
-    """
-    display_time = time.time()
-
-    for job in SCHEDULER.get_jobs():
-        SCHEDULER.remove_job(job.id)
-        TFT.clear_job_display()
-
-    # Add all jobs that are stored in database
-    store = DB()
-    valve_configs = store.load_valve_configs()
-    for config in valve_configs:
-        if config['on_time'] and config['on_duration'] and config['is_active']:
-            TFT.display_job(config)
-            time_components = [int(x) for x in config['on_time'].split(':')]
-            if config['interval_type'] == 'daily':
-                SCHEDULER.add_job(valve_job,
-                                  'cron',
-                                  day_of_week='mon-sun',
-                                  hour=time_components[0],
-                                  minute=time_components[1],
-                                  second=time_components[2],
-                                  args=[config])
-                #print('Scheduled daily job [%i:%i]'
-                #      % (time_components[0], time_components[1]))
-            if config['interval_type'] == 'weekly':
-                SCHEDULER.add_job(valve_job,
-                                  'cron',
-                                  day_of_week='sun',
-                                  hour=time_components[0],
-                                  minute=time_components[1],
-                                  second=time_components[2],
-                                  args=[config])
-                #print('Scheduled weekly job [sun %i:%i]'
-                #      % (time_components[0], time_components[1]))
-            if config['interval_type'] == 'monthly':
-                SCHEDULER.add_job(valve_job,
-                                  'cron',
-                                  day=1,
-                                  hour=time_components[0],
-                                  minute=time_components[1],
-                                  second=time_components[2],
-                                  args=[config])
-                #print('Scheduled monthly job [1st of the month %i:%i]'
-                #      % (time_components[0], time_components[1]))
-
-    # print('JOBS:')
-    # print(SCHEDULER.get_jobs())
-
-    while time.time() - display_time < 5:
-        time.sleep(1)
-    TFT.clear()
-    TFT.set_background_image('static/gfx/lcd-ui-background.png', pos_x=0, pos_y=0)
-    add_tft_job()
-
-    return True
-
-def add_tft_job():
-    """
-    Job for updating tft display
-    """
-    def tft_job():
-        #if(os.getenv('SSH_CLIENT')):
-        #    os.environ.get('SSH_CLIENT')
-        #    os.environ['SSH_CLIENT'] // nothing ?
-        #    TFT.display_text(os.getenv('SSH_CLIENT'),
-        #                              24,
-        #                              (205, 30),
-        #                              (249, 116, 75),
-        #                              (0, 110, 46))
-        # text, size, pos_x, pos_y, color, bg_color
-        TFT.display_text(time.strftime('%H:%M:%S'), 40, 205, 10, (255, 255, 255), (0, 110, 46))
-        TFT.update_job_display()
-
-    SCHEDULER.add_job(tft_job, 'interval', seconds=1)
-
-    return True
 
 ################################################################################
 # Authentication
@@ -520,15 +384,6 @@ def shutdown():
 # Unloading
 ################################################################################
 
-def unload_scheduler():
-    """
-    Scheduler cleanups
-    """
-    SCHEDULER.shutdown()
-    VALVES.disable()
-
-    return True
-
 def unload_flask():
     """
     Flask cleanup
@@ -606,14 +461,10 @@ if __name__ != "__main__":
     #gunicorn_logger = logging.getLogger(‘gunicorn.error’)
     #app.logger.handlers = gunicorn_logger.handlers
     #app.logger.setLevel(gunicorn_logger.level)
-    TFT = Display()
-    TFT.display_image('static/gfx/lcd-skrubba-color.png',
-                      pos_x=67, pos_y=10, clear_screen=True)
-    # All valves off
-    VALVES = Shiftregister()
-    if not SCHEDULER.running:
-        start_scheduler()
-        restart_job_manager()
+    SCHEDULER = Scheduler()
+    if not SCHEDULER.is_running():
+        SCHEDULER.start_scheduler()
+        SCHEDULER.restart_job_manager()
         #setup_backend_user_tracking()
 
 if __name__ == "__main__":
@@ -624,10 +475,10 @@ if __name__ == "__main__":
     #exit;
     #if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
     # All valves off
-    VALVES = Shiftregister()
-    if not SCHEDULER.running:
-        start_scheduler()
-        restart_job_manager()
+    SCHEDULER = Scheduler()
+    if not SCHEDULER.is_running():
+        SCHEDULER.start_scheduler()
+        SCHEDULER.restart_job_manager()
         #setup_backend_user_tracking()
 
     PORT = 8000 if RUNNINGONPI else 2525
