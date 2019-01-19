@@ -6,9 +6,9 @@ Use defined data pin
 by Kana kanabanarama@googlemail.com
 """
 
-import environment
+from config.environment import RUNNINGONPI
 
-if environment.RUNNINGONPI:
+if RUNNINGONPI:
     import RPi.GPIO as GPIO # pylint: disable=import-error,unused-import
 else:
     import FakeRPi as GPIO  # pylint: disable=import-error

@@ -7,13 +7,14 @@ by Kana kanabanarama@googlemail.com
 """
 
 import os
+import sys
 import sqlite3
 
 class DB():
     """
     Class for saving and loading configuration
     """
-    _store_path = 'store/skrubba.db'
+    _store_path = os.path.dirname(sys.modules['main'].__file__) + '/store/skrubba.db'
     _connection = None
     _cursor = None
 

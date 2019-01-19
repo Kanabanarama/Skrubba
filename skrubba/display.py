@@ -11,7 +11,8 @@ import sys
 import signal
 import time
 import pygame   # pylint: disable=import-error
-import environment
+
+from config.environment import RUNNINGONPI
 
 class Display():
     """
@@ -31,8 +32,10 @@ class Display():
     _job_dict = []
     _active_jobs = []
 
+    _root_dir = os.path.dirname(sys.modules['main'].__file__) + '/'
+
     def __init__(self):
-        if environment.RUNNINGONPI:
+        if RUNNINGONPI:
             os.environ['SDL_FBDEV'] = '/dev/fb1'
             os.environ['SDL_VIDEODRIVER'] = 'fbcon'
         pygame.init()
@@ -81,7 +84,7 @@ class Display():
         """
         Sets default background image
         """
-        self._background_image = {'url': url, 'x': pos_x, 'y': pos_y}
+        self._background_image = {'url': self._root_dir + url, 'x': pos_x, 'y': pos_y}
         self.display_image(url, pos_x, pos_y, True)
         return self
 
@@ -91,7 +94,7 @@ class Display():
         """
         if clear_screen:
             self.clear()
-        image = pygame.image.load(url)
+        image = pygame.image.load(self._root_dir + url)
         self._screen.blit(image, (pos_x, pos_y))
         pygame.display.flip()
 

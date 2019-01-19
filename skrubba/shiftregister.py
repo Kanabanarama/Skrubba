@@ -7,9 +7,10 @@ by Kana kanabanarama@googlemail.com
 """
 
 import time
-import environment
 
-if environment.RUNNINGONPI:
+from config.environment import RUNNINGONPI
+
+if RUNNINGONPI:
     import RPi.GPIO as GPIO # pylint: disable=import-error,unused-import
 else:
     import FakeRPi as GPIO  # pylint: disable=import-error
