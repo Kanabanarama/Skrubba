@@ -35,10 +35,10 @@ TOKEN_EXPIRATION = 7200
 SCHEDULER = BackgroundScheduler(standalone=True)
 
 # Serve all static files from within template folder
-if DEBUG:
-    from werkzeug import SharedDataMiddleware
-    APP.wsgi_app = SharedDataMiddleware(APP.wsgi_app, {
-        '/': os.path.join(os.path.dirname(__file__), 'templates')})
+#if DEBUG:
+from werkzeug import SharedDataMiddleware
+APP.wsgi_app = SharedDataMiddleware(APP.wsgi_app, {
+    '/': os.path.join(os.path.dirname(__file__), 'templates')})
 
 ################################################################################
 # Scheduler
