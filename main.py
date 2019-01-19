@@ -50,30 +50,24 @@ def valve_job(valve_setting): #(valve, onDuration)
     """
     Open a valve specified with settings
     """
-    print('OPENING VALVE')
     TFT.mark_active_job(valve_setting['id'], True)
     duration_left = int(valve_setting['on_duration']) + 2
     #binaryValveList = map(int, list(format(valve_setting['valve'], '08b')))
-    #print binaryValveList
     pump = Relay()
     pump.switch_on()
     time.sleep(1)
     #VALVES = Shiftregister()
     #shiftreg.output_list(binaryValveList)
     VALVES.output_decimal(valve_setting['valve'])
-    #VALVES.enable()
+    VALVES.enable()
     while duration_left > 2:
         time.sleep(1)
         duration_left -= 1
-        print('TIME LEFT: %i' % (duration_left - 1))
-    print('CLOSING VALVE')
     pump.switch_off()
-    print('reset shift register 1')
-    #VALVES.disable()
+    VALVES.disable()
     VALVES.reset()
     time.sleep(1)
 
-    #VALVES.reset()
     TFT.mark_active_job(valve_setting['id'], False)
     store = DB()
     store.add_log_line(valve_setting, datetime.now())
@@ -195,9 +189,7 @@ def requires_auth(func):
 
         header_auth_token = request.headers.get('authentication')
         if not header_auth_token or not check_auth_token(header_auth_token):
-            print('return deny_access_token()')
             return deny_access_token()
-        print('return func()')
         return func(*args, **kwargs)
 
     return decorated
@@ -220,7 +212,6 @@ def generate_auth_token(credentials, expiration=TOKEN_EXPIRATION):
     Generates the auth token
     """
     serializer = Serializer(APP.config['SECRET_KEY'], expires_in=expiration)
-    print("'username': credentials['username']")
 
     return serializer.dumps({'username': credentials['username']})
 
@@ -261,10 +252,6 @@ def action_login():
                 system_credentials['username'] = line['setting_value']
             if line['setting_name'] == 'password':
                 system_credentials['password'] = line['setting_value']
-
-                print(system_credentials['username'])
-                print(system_credentials['password'])
-
         if len(system_credentials) == 2 \
                 and request_username == system_credentials['username'] \
                 and request_password == system_credentials['password']:
@@ -284,16 +271,13 @@ def localhost_only(func):
     @wraps(func)
     def decorated(*args, **kwargs):
         request_ip = request.remote_addr
-        print('checking request origin: %s' % request_ip)
         if DEBUG:
             allowed = True
         else:
             allowed = (request_ip == '127.0.0.1')
-        print('allowed: %i' % allowed)
         if not allowed:
             print('return denyIp()' + request_ip)
             return deny_request_ip()
-        #print('return func()')
         return func(*args, **kwargs)
     return decorated
 
@@ -321,8 +305,6 @@ def plant():
 
     if action == 'read':
         valve_configs = store.load_valve_configs()
-        # print('READ VALVE CONFIG:')
-        # print(valve_configs)
         response = json.dumps({'plant': valve_configs})
 
     elif action == 'create':
@@ -332,8 +314,6 @@ def plant():
         max_valves = store.get_max_valve_count_setting()
         actual_valves = store.get_valve_count()
         if not max_valves or actual_valves < max_valves:
-            # print('CREATED VALVE CONFIG:')
-            # print(valve_configs)
             try:
                 new_entry = store.add_valve_config(valve_configs)
             except:
@@ -352,8 +332,6 @@ def plant():
     elif action == 'update':
         json_valve_configs_from_request = request.form['plant']
         valve_configs = json.loads(json_valve_configs_from_request)
-        # print('UPDATED VALVE CONFIG:')
-        # print(valve_configs)
         success = store.update_valve_config(valve_configs)
         if success:
             restart_job_manager()
@@ -394,7 +372,7 @@ def log():
     return response
 
 @APP.route("/data/setting.json", methods=['GET', 'POST'])
-#@requires_auth
+@requires_auth
 @localhost_only
 def setting():
     """
@@ -475,7 +453,7 @@ def setting_delete():
 # Flask action routes
 ################################################################################
 
-@APP.route("/action/manualwatering", methods=['GET', 'POST'])
+@APP.route("/actions/manualwatering", methods=['GET', 'POST'])
 @requires_auth
 @localhost_only
 def action_manualwatering():
@@ -485,8 +463,11 @@ def action_manualwatering():
     if request.method == 'POST':
         params = request.get_json()
         valve_no = params['valve']
-        VALVES.output_binary(valve_no)
-        print("OPENED VALVE %i" % valve_no)
+        VALVES.output_decimal(valve_no)
+        VALVES.enable()
+        time.sleep(3)
+        VALVES.disable()
+        VALVES.reset()
     response = json.dumps({'success': 'true'})
 
     return response
@@ -543,8 +524,8 @@ def unload_scheduler():
     """
     Scheduler cleanups
     """
-    print('Shutting down scheduler...')
     SCHEDULER.shutdown()
+    VALVES.disable()
 
     return True
 
@@ -555,7 +536,6 @@ def unload_flask():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
-    print('Shutting down flask...')
     func()
 
     return True
@@ -567,6 +547,14 @@ def unload_flask():
 ################################################################################
 # Flask main
 ################################################################################
+
+@APP.route("/test", methods=['GET'])
+def test():
+    """
+    Output test
+    """
+    #return 'It works.'
+    return render_template('test.html')
 
 # Serve favicon from static folder
 @APP.route('/favicon.ico')
@@ -614,23 +602,34 @@ def refresh_keepalive():
 
 #import argparse
 #""
+if __name__ != "__main__":
+    #gunicorn_logger = logging.getLogger(‘gunicorn.error’)
+    #app.logger.handlers = gunicorn_logger.handlers
+    #app.logger.setLevel(gunicorn_logger.level)
+    TFT = Display()
+    TFT.display_image('static/gfx/lcd-skrubba-color.png',
+                      pos_x=67, pos_y=10, clear_screen=True)
+    # All valves off
+    VALVES = Shiftregister()
+    if not SCHEDULER.running:
+        start_scheduler()
+        restart_job_manager()
+        #setup_backend_user_tracking()
+
 if __name__ == "__main__":
     #parser = argparse.ArgumentParser(description = 'Let program simulate on local machine.')
     #parser.add_argument('local')
     #args = parser.parse_args()
     #print args.accumulate(args.local)
     #exit;
-    if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        TFT = Display()
-        TFT.display_image('static/gfx/lcd-skrubba-color.png',
-                          pos_x=67, pos_y=10, clear_screen=True)
-        # All valves off
-        VALVES = Shiftregister()
-        if not SCHEDULER.running:
-            start_scheduler()
-            restart_job_manager()
-            setup_backend_user_tracking()
+    #if not DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    # All valves off
+    VALVES = Shiftregister()
+    if not SCHEDULER.running:
+        start_scheduler()
+        restart_job_manager()
+        #setup_backend_user_tracking()
 
     PORT = 8000 if RUNNINGONPI else 2525
     print('STARTING APP ON PORT %i WITH DEBUG %i' % (PORT, DEBUG,))
-    APP.run(host='0.0.0.0', port=PORT, debug=DEBUG)
+    APP.run(host='0.0.0.0', port=PORT, debug=DEBUG, threaded=True)

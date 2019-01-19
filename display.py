@@ -36,16 +36,15 @@ class Display():
             os.environ['SDL_FBDEV'] = '/dev/fb1'
             os.environ['SDL_VIDEODRIVER'] = 'fbcon'
         pygame.init()
-
         # fbcon sometimes not freed when app crashes
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
-
         pygame.mouse.set_visible(0)
         self._font = pygame.font.Font(None, 30)
         self._minifont = pygame.font.Font(None, 15)
         self._midifont = pygame.font.Font(None, 24)
-        self._screen = pygame.display.set_mode((self._width, self._height), pygame.FULLSCREEN)
+        #self._screen = pygame.display.set_mode((self._width, self._height), pygame.HWSURFACE | pygame.DOUBLEBUF)
+        self._screen = pygame.display.set_mode((self._width, self._height), pygame.FULLSCREEN) # Slower?
 
     def __del__(self):
         """
@@ -56,7 +55,7 @@ class Display():
 
         return True
 
-    def signal_handler(signal, frame):
+    def signal_handler(self, signal, frame, test):
       print('Signal: {}'.format(signal))
       time.sleep(1)
       pygame.quit()

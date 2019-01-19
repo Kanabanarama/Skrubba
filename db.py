@@ -157,10 +157,10 @@ class DB():
                 config['is_active'],
                 config['id']))
             self._connection.commit()
-            success = True
-        except sqlite3.IntegrityError:
-            success = False
-        return success
+            result = True
+        except (TypeError, sqlite3.IntegrityError) as e:
+            result = str(e)
+        return result
 
     def delete_valve_config(self, valve_id):
         """

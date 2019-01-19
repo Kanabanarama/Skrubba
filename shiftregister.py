@@ -31,10 +31,10 @@ class Shiftregister():
         GPIO.setup(self._CLOCK, GPIO.OUT)
         GPIO.setup(self._LATCH, GPIO.OUT)
         GPIO.output(self._LATCH, 0)
-        self.reset() # set all outputs to HIGH (->OFF for relays)
         GPIO.setup(self._OE, GPIO.OUT)
-        #GPIO.output(self._OE, 0) # enable output
-        self.enable()
+        GPIO.output(self._OE, 1) # enable output
+        self.reset() # set all outputs to HIGH (->OFF for relays)
+        #self.enable()
 
     def __del__(self):
         return #GPIO.cleanup()
@@ -93,6 +93,7 @@ class Shiftregister():
         """
         Outputs high to the pin numbered binary
         """
+        self.enable()
         bits = [True for i in range(8)]
         for i in range(8):
             bits[7-i] = False if binary_value & 1 else True
